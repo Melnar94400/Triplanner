@@ -77,13 +77,13 @@ export default function JoinTripPage() {
   if (!session) {
     return (
       <div className="min-h-screen bg-[#f0f5f2] flex flex-col items-center justify-center p-4 font-sans">
-        <div className="bg-white border border-[#d2e4d8] w-full max-w-md p-8 rounded-3xl shadow-sm text-center space-y-6">
+        <div className="bg-white border border-[#1e2d24] w-full max-w-md p-8 rounded-3xl shadow-sm text-center space-y-6">
           <div className="w-16 h-16 bg-[#a8d4b7] rounded-2xl mx-auto flex items-center justify-center text-[#16221a]">
             <Users size={32} />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-[#16221a] mb-2">Invitation à un voyage 🎒</h1>
-            <p className="text-sm text-[#2c3d31]">Connectez-vous ou créez un compte pour rejoindre ce séjour entre amis.</p>
+            <h1 className="text-2xl font-black text-[#e2ede6] mb-2">Invitation à un voyage 🎒</h1>
+            <p className="text-sm text-[#e2ede6]">Connectez-vous ou créez un compte pour rejoindre ce séjour entre amis.</p>
           </div>
           <button 
             onClick={() => router.push('/login')} 
@@ -101,7 +101,7 @@ export default function JoinTripPage() {
       <div className="min-h-screen bg-[#f0f5f2] flex flex-col items-center justify-center p-4 font-sans">
         <div className="bg-white border border-red-200 w-full max-w-md p-8 rounded-3xl shadow-sm text-center space-y-4">
           <h1 className="text-xl font-black text-red-600">Oups !</h1>
-          <p className="text-sm text-[#16221a]">{error}</p>
+          <p className="text-sm text-[#e2ede6]">{error}</p>
           <button 
             onClick={() => router.push('/')} 
             className="w-full bg-[#16221a] text-white py-3 rounded-xl font-bold shadow-md"
