@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f0f5f2;
+  --foreground: #243329;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #141f19;
+    --foreground: #d4e2d8;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* --- FINITION : Surlignage assorti --- */
+::selection {
+  background-color: #ffedd5;
+  color: #9a3412;
+}
+
+@layer base {
+  /* --- THÈME CLAIR : VERT SAUGE & PASTEL DOUX --- */
+  body {
+    background-color: #97b5a5 !important; 
+    color: #243329 !important;
+  }
+  
+  .bg-white {
+    background-color: #c0e8cd !important; 
+    border-color: #d2e4d8 !important;
+    color: #243329 !important;
+  }
+
+  .border-gray-100, .border-gray-200 {
+    border-color: #d8e6dc !important;
+  }
+  
+  .bg-gray-50, .bg-gray-100 {
+    background-color: #a8d4b7 !important; 
+    border-color: #c5dacf !important;
+    color: #2c3b32 !important;
+  }
+
+  .text-gray-800, .text-gray-900, .text-gray-700 {
+    color: #16221a !important;
+  }
+  
+  .text-gray-500, .text-gray-600, .text-gray-300, .text-gray-400 {
+    color: #2c3d31 !important;
+  }
+
+  /* --- CHAMPS DE SAISIE (Inputs, Selects, Textareas) --- */
+  input, select, textarea {
+    background-color: #f7faf8 !important;
+    color: #16221a !important;
+    border-color: #b7e4c7 !important;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: #9a3412 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(154, 52, 18, 0.25) !important;
+  }
+
+  /* --- ACCENTS : TERRACOTTA / AMBRE --- */
+  .bg-indigo-600, .bg-indigo-500 {
+    background-color: #9a3412 !important;
+  }
+  .hover\:bg-indigo-700:hover {
+    background-color: #7c2d12 !important;
+  }
+  .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-500 {
+    color: #9a3412 !important;
+  }
+  .bg-indigo-50, .bg-indigo-100 {
+    background-color: #ffedd5 !important;
+    color: #7c2d12 !important;
+  }
+  .border-indigo-100, .border-indigo-50 {
+    border-color: #fed7aa !important;
+  }
+
+  /* --- MODE SOMBRE COHÉRENT (Vert-Charbon / Nuit) --- */
+  .dark body {
+    background-color: #141f19 !important; /* Vert charbon profond, pas un noir brut */
+    color: #d4e2d8 !important;            /* Vert clair poudré, moins agressif que le blanc */
+  }
+  .dark .bg-white {
+    background-color: #1e2d24 !important; /* Vert sombre mat pour les cartes */
+    border-color: #2c4033 !important;
+    color: #d4e2d8 !important;
+  }
+  .dark .bg-gray-50, .dark .bg-gray-100 {
+    background-color: #24362b !important; /* Légère nuance pour les blocs secondaires */
+    border-color: #364f3f !important;
+    color: #e2ede6 !important;
+  }
+  .dark .text-gray-800, .dark .text-gray-900, .dark .text-gray-700 {
+    color: #e2ede6 !important;
+  }
+  .dark .text-gray-500, .dark .text-gray-600, .dark .text-gray-300, .dark .text-gray-400 {
+    color: #9ab0a1 !important;
+  }
+  .dark input, .dark select, .dark textarea {
+    background-color: #1e2d24 !important;
+    color: #d4e2d8 !important;
+    border-color: #364f3f !important;
+  }
+  .dark input:focus, .dark select:focus, .dark textarea:focus {
+    border-color: #c2410c !important;
+    box-shadow: 0 0 0 2px rgba(194, 65, 12, 0.3) !important;
+  }
+}

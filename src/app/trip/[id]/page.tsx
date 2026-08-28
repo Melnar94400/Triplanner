@@ -1,0 +1,1211 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { supabase } from '../../../lib/supabase'
+import dynamic from 'next/dynamic'
+import {
+  Calendar, MapPin, Users, Utensils, ShoppingBag, PieChart,
+  Plus, Check, X, Pencil, Trash2, ArrowRight, Compass, Loader2, ChevronLeft,
+  Star, ExternalLink, Edit3, CalendarDays, Camera, RotateCw, ChevronRight, Play, Copy,
+  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target, Moon, Sun
+} from 'lucide-react'
+import EXIF from 'exif-js'
+
+// Import dynamique de la carte pour éviter l'erreur "window is not defined" côté serveur
+const MapView = dynamic(() => import('./MapView'), { ssr: false })
+
+type Meal = { id: string | number; day: string; type: string; name: string; starter?: string; dessert?: string; drinks?: string; recipeLink?: string; cooks: string[]; ingredients: { name: string; qty: string }[]; };
+type Member = { id: string; name: string; avatar: string; role: string; };
+type ActivityVote = 'yes' | 'maybe' | 'no';
+type Activity = {
+  id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>;
+}
+const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
+const WEEK_DAYS = ['Samedi', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+
+type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
+type PendingMedia = { id: string; file: File; preview: string; day: string; time_slot: string; };
+
+export default function TripPage() {
+  const params = useParams()
+  const router = useRouter()
+  const tripId = params.id as string
+
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [members, setMembers] = useState<Member[]>([])
+  const [activeTab, setActiveTab] = useState('destination') // L'onglet par défaut fusionné
+  const [trip, setTrip] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [settlements, setSettlements] = useState<any[]>([]);
+  const [weather, setWeather] = useState<any[] | null>(null);
+  
+// Destination States (Proposals)
+  const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
+  const [proposedRegions, setProposedRegions] = useState<any[]>([])
+  const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
+  
+  const [newWeek, setNewWeek] = useState('')
+  const [newRegion, setNewRegion] = useState('')
+  const [editingRegionId, setEditingRegionId] = useState<string | null>(null)
+  
+  const [showPlaceForm, setShowPlaceForm] = useState(false)
+  const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null)
+  const [placeData, setPlaceData] = useState({ name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null as number|null, lng: null as number|null })  
+  // Lock States (Admin)
+  const [lockWeek, setLockWeek] = useState('')
+  const [lockRegion, setLockRegion] = useState('')
+  const [lockPlaceId, setLockPlaceId] = useState('')
+  const [isLocking, setIsLocking] = useState(false)
+
+  // Meals States
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({});
+  const [showMealForm, setShowMealForm] = useState(false);
+  const [editingMealId, setEditingMealId] = useState<string | number | null>(null);
+  const [mealDay, setMealDay] = useState('Samedi');
+  const [mealType, setMealType] = useState('Dîner');
+  const [mealName, setMealName] = useState('');
+  const [mealStarter, setMealStarter] = useState('');
+  const [mealDessert, setMealDessert] = useState('');
+  const [mealDrinks, setMealDrinks] = useState('');
+  const [mealRecipeLink, setMealRecipeLink] = useState('');
+  const [mealCooks, setMealCooks] = useState<string[]>([]);
+  const [mealIngredients, setMealIngredients] = useState<{name: string, qty: string}[]>([]);
+  
+  // Extra Shopping Items States
+  const [extraItems, setExtraItems] = useState<{id: string, name: string, qty: string}[]>([]);
+  const [newExtraItem, setNewExtraItem] = useState('');
+  const [newExtraQty, setNewExtraQty] = useState('');
+
+  // Activities States
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [showActivityForm, setShowActivityForm] = useState(false)
+  const [editingActivityId, setEditingActivityId] = useState<string | number | null>(null)
+  const [actTitle, setActTitle] = useState('')
+  const [actDesc, setActDesc] = useState('')
+  const [actPrice, setActPrice] = useState<number | string>('')
+  const [actLink, setActLink] = useState('')
+  const [actAddress, setActAddress] = useState('')
+  const [actDay, setActDay] = useState('')
+  const [actTimeSlot, setActTimeSlot] = useState('')
+  const [isSavingAct, setIsSavingAct] = useState(false)
+
+  // Expenses States
+  const [expenses, setExpenses] = useState<{ id: string | number; title: string; amount: number; paidBy: string; splitAmong: string[] }[]>([]);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | number | null>(null);
+  const [expenseTitle, setExpenseTitle] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
+  const [expensePayer, setExpensePayer] = useState<string>('');
+  const [expenseSplitAmong, setExpenseSplitAmong] = useState<string[]>([]);
+
+  // Media States
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedSlotForMedia, setSelectedSlotForMedia] = useState<{day: string, slot: string} | null>(null);
+  const [gallerySortMode, setGallerySortMode] = useState<'date' | 'moment'>('date');
+  const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
+  const [pendingMediaItems, setPendingMediaItems] = useState<PendingMedia[]>([]);
+  const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null);
+  const [editMediaDay, setEditMediaDay] = useState('');
+  const [editMediaSlot, setEditMediaSlot] = useState('');
+
+  // Lightbox
+  const [viewerItems, setViewerItems] = useState<MediaItem[]>([]);
+  const [viewerCurrentIndex, setViewerCurrentIndex] = useState<number | null>(null);
+  const [viewerRotation, setViewerRotation] = useState(0);
+
+  const openViewer = (items: MediaItem[], index: number) => { setViewerItems(items); setViewerCurrentIndex(index); setViewerRotation(0); };
+  const closeViewer = () => setViewerCurrentIndex(null);
+  const nextMedia = () => { setViewerCurrentIndex(prev => (prev! + 1) % viewerItems.length); setViewerRotation(0); };
+  const prevMedia = () => { setViewerCurrentIndex(prev => (prev! - 1 + viewerItems.length) % viewerItems.length); setViewerRotation(0); };
+  const rotateMedia = () => setViewerRotation(prev => prev + 90);
+
+  useEffect(() => {
+    fetchTripData()
+
+    const channel = supabase.channel('trip_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_weeks' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_regions' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_places' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meals' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_votes' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'media' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => { fetchTripData() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [tripId])
+
+  useEffect(() => {
+    if (trip?.accommodation_lat && trip?.accommodation_lng) {
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${trip.accommodation_lat}&longitude=${trip.accommodation_lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.daily) {
+            const forecast = data.daily.time.map((date: string, i: number) => ({ date, max: data.daily.temperature_2m_max[i], min: data.daily.temperature_2m_min[i], code: data.daily.weathercode[i] }));
+            setWeather(forecast);
+          }
+        }).catch(e => console.error(e));
+    }
+  }, [trip?.accommodation_lat, trip?.accommodation_lng]);
+
+  const getWeatherIcon = (code: number) => {
+    if (code === 0) return '☀️'; if (code >= 1 && code <= 3) return '⛅'; if (code >= 45 && code <= 48) return '🌫️'; 
+    if (code >= 51 && code <= 67) return '🌧️'; if (code >= 71 && code <= 77) return '❄️'; if (code >= 80 && code <= 82) return '🌦️'; 
+    if (code >= 95 && code <= 99) return '⛈️'; return '☁️';
+  }
+
+  async function fetchTripData() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return; }
+      setCurrentUser(session.user)
+
+      const { data: tripData, error: tripError } = await supabase.from('trips').select('*').eq('id', tripId).single()
+      if (tripError) throw tripError
+      setTrip(tripData)
+
+      const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId)
+      if (wData) setProposedWeeks(wData.map((w:any) => ({id: w.id, text: w.week_text, votes: w.votes || [], by: w.proposed_by})))
+
+      const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId)
+      if (rData) setProposedRegions(rData.map((r:any) => ({id: r.id, name: r.name, ratings: r.ratings || {}, by: r.proposed_by})))
+
+const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId)
+      if (pData) setProposedPlaces(pData.map((p:any) => ({id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, beds: p.beds, amenities: p.amenities, link: p.link, ratings: p.ratings || {}, by: p.proposed_by})))
+      const { data: settlementsData } = await supabase.from('settlements').select('*').eq('trip_id', tripId);
+      setSettlements(settlementsData || []);
+
+      const { data: membersData } = await supabase.from('trip_members').select('user_id, role, profiles(id, name, avatar)').eq('trip_id', tripId)
+      let loadedMembers: Member[] = []
+      let isUserInTrip = false
+
+      if (membersData) {
+        loadedMembers = membersData.map((m: any) => ({ id: m.profiles.id, name: m.profiles.name, avatar: m.profiles.avatar || '👤', role: m.role }))
+        isUserInTrip = loadedMembers.some(m => m.id === session.user.id)
+      }
+
+      if (!isUserInTrip) {
+        await supabase.from('trip_members').insert({ trip_id: tripId, user_id: session.user.id, role: 'admin' })
+        const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+        if (myProfile) loadedMembers.push({ id: myProfile.id, name: myProfile.name, avatar: myProfile.avatar || '👤', role: 'admin' })
+      }
+      setMembers(loadedMembers)
+
+      const { data: mealsData } = await supabase.from('meals').select('*, meal_ingredients(name, qty), meal_cooks(user_id)').eq('trip_id', tripId)
+      if (mealsData) setMeals(mealsData.map((m: any) => ({ id: m.id, day: m.day, type: m.type, name: m.name, starter: m.starter || '', dessert: m.dessert || '', drinks: m.drinks || '', recipeLink: m.recipe_link || '', cooks: m.meal_cooks.map((c: any) => c.user_id), ingredients: m.meal_ingredients })))
+
+      const { data: activitiesData } = await supabase.from('activities').select('*, activity_votes(user_id, vote)').eq('trip_id', tripId)
+      if (activitiesData) {
+        setActivities(activitiesData.map((a: any) => {
+          const votes: Record<string, ActivityVote> = {}; a.activity_votes.forEach((v: any) => votes[v.user_id] = v.vote);
+          return { id: a.id, title: a.title, description: a.description || '', price: a.price || '', link: a.link || '', address: a.address || '', durationFromAcc: a.duration_from_acc || '', day: a.day || '', timeSlot: a.time_slot || '', lat: a.lat, lng: a.lng, proposedBy: a.proposed_by || session.user.id, votes }
+        }))
+      }
+
+      const { data: extraData } = await supabase.from('shopping_items').select('*').eq('trip_id', tripId);
+      if (extraData) setExtraItems(extraData.map((item: any) => ({ id: item.id, name: item.name, qty: item.qty || '' })));
+      
+      const { data: mediaData } = await supabase.from('media').select('*').eq('trip_id', tripId).order('created_at', { ascending: false });
+      if (mediaData) setMediaItems(mediaData);  
+
+      const { data: expensesData } = await supabase.from('expenses').select('*').eq('trip_id', tripId);
+      if (expensesData) setExpenses(expensesData.map((e: any) => ({ id: e.id, title: e.title, amount: e.amount, paidBy: e.paid_by, splitAmong: e.split_among || [] })));
+      
+    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
+  }
+
+  // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
+  const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin';
+  const isLocked = trip?.is_planning_locked;
+
+const handleSaveWeek = async (e?: React.FormEvent) => {
+    if(e) e.preventDefault();
+    if(!newWeek.trim()) return;
+    await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]);
+    setNewWeek(''); fetchTripData();
+  }
+  const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
+    if(!currentUser) return;
+    const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
+    setProposedWeeks(prev => prev.map(w => w.id === weekId ? {...w, votes: newVotes} : w));
+    await supabase.from('proposed_weeks').update({votes: newVotes}).eq('id', weekId);
+  }
+
+  const handleSaveRegion = async (e?: React.FormEvent) => {
+    if(e) e.preventDefault();
+    if(!newRegion.trim()) return;
+    if (editingRegionId) {
+      await supabase.from('proposed_regions').update({ name: newRegion }).eq('id', editingRegionId);
+      setEditingRegionId(null);
+    } else {
+      await supabase.from('proposed_regions').insert([{trip_id: tripId, name: newRegion, proposed_by: currentUser.id}]);
+    }
+    setNewRegion(''); fetchTripData();
+  }
+  const startEditRegion = (r: any) => { setEditingRegionId(r.id); setNewRegion(r.name); }
+  const handleDeleteRegion = async (id: string) => { if(confirm("Supprimer cette région ?")) { await supabase.from('proposed_regions').delete().eq('id', id); fetchTripData(); } }
+  
+  const handleRegionRating = async (regionId: string, currentRatings: any, score: number) => {
+    if(!currentUser) return;
+    const newRatings = {...currentRatings, [currentUser.id]: score};
+    setProposedRegions(prev => prev.map(r => r.id === regionId ? {...r, ratings: newRatings} : r));
+    await supabase.from('proposed_regions').update({ratings: newRatings}).eq('id', regionId);
+  }
+
+  const handleSavePlace = async (e?: React.FormEvent) => {
+    if(e) e.preventDefault();
+    if(!placeData.name.trim() || !placeData.address.trim()) return alert("Nom et adresse requis.");
+    let lat = placeData.lat, lng = placeData.lng;
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeData.address)}`);
+      const geo = await res.json();
+      if(geo && geo.length > 0) { lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon); }
+    } catch(err) {}
+    
+    const payload = {
+      trip_id: tripId, name: placeData.name, address: placeData.address,
+      price: placeData.price ? Number(placeData.price) : null, beds: placeData.beds ? Number(placeData.beds) : null,
+      amenities: placeData.amenities, link: placeData.link, lat, lng
+    };
+
+    if (editingPlaceId) {
+      await supabase.from('proposed_places').update(payload).eq('id', editingPlaceId);
+    } else {
+      await supabase.from('proposed_places').insert([{ ...payload, proposed_by: currentUser.id }]);
+    }
+    setShowPlaceForm(false); setEditingPlaceId(null); setPlaceData({name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null, lng: null}); fetchTripData();
+  }
+  const startEditPlace = (p: any) => { setEditingPlaceId(p.id); setPlaceData({ name: p.name, address: p.address, price: p.price || '', beds: p.beds || '', amenities: p.amenities || '', link: p.link || '', lat: p.lat, lng: p.lng }); setShowPlaceForm(true); }
+  const handleDeletePlace = async (id: string) => { if(confirm("Supprimer ce gîte ?")) { await supabase.from('proposed_places').delete().eq('id', id); fetchTripData(); } }
+
+  const togglePlaceVote = async (placeId: string, currentVotes: string[]) => {
+    if(!currentUser) return;
+    const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
+    setProposedPlaces(prev => prev.map(p => p.id === placeId ? {...p, votes: newVotes} : p));
+    await supabase.from('proposed_places').update({votes: newVotes}).eq('id', placeId);
+  }
+
+// --- GESTION DU CONSENSUS ---
+  const getRatingStats = (ratings: Record<string, number>) => { 
+    const scores = Object.values(ratings); 
+    if (scores.length === 0) return { avg: 0, sd: 0, consensus: 0 }; 
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length; 
+    // Calcul de l'écart type (dispersion)
+    const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length;
+    const sd = Math.sqrt(variance);
+    // Algorithme : On pénalise la moyenne si l'écart type est grand (Option clivante = Note qui chute)
+    let consensus = avg - (sd * 0.8);
+    return { avg, sd, consensus: Math.max(0, consensus) }; 
+  }
+
+  // --- VOTES (ÉTOILES) ---
+  const handlePlaceRating = async (placeId: string, currentRatings: any, score: number) => {
+    if(!currentUser) return;
+    const newRatings = {...currentRatings, [currentUser.id]: score};
+    setProposedPlaces(prev => prev.map(p => p.id === placeId ? {...p, ratings: newRatings} : p));
+    await supabase.from('proposed_places').update({ratings: newRatings}).eq('id', placeId);
+  }
+
+  // --- VERROUILLAGE EN 2 PHASES (ADMIN) ---
+  const handleLockPhase1 = async () => {
+    if (!lockWeek || !lockRegion) return alert("Sélectionnez la semaine et la région !");
+    setIsLocking(true);
+    try {
+      await supabase.from('trips').update({ trip_week: lockWeek, trip_region: lockRegion }).eq('id', tripId);
+      await fetchTripData();
+    } catch(err:any) { alert(err.message); } finally { setIsLocking(false); }
+  }
+
+  const handleUnlockPhase1 = async () => {
+    if (!confirm("Revenir au vote de la région ? Les gîtes proposés seront conservés.")) return;
+    await supabase.from('trips').update({ trip_week: null, trip_region: null }).eq('id', tripId);
+    fetchTripData();
+  }
+
+  const handleLockPhase2 = async () => {
+    const place = proposedPlaces.find(p => p.id === lockPlaceId);
+    if (!place) return alert("Sélectionnez le gîte final.");
+    setIsLocking(true);
+    try {
+      await supabase.from('trips').update({
+        accommodation_name: place.name, accommodation_address: place.address,
+        accommodation_lat: place.lat, accommodation_lng: place.lng, is_planning_locked: true
+      }).eq('id', tripId);
+      await fetchTripData(); setActiveTab('activities');
+    } catch(err:any) { alert(err.message); } finally { setIsLocking(false); }
+  }
+  const handleUnlockTrip = async () => {
+    if (!confirm("Déverrouiller le voyage ?")) return;
+    await supabase.from('trips').update({ is_planning_locked: false }).eq('id', tripId);
+    fetchTripData();
+  };
+  
+  const checkLock = (tabName: string, e: React.MouseEvent) => {
+    if (!isLocked) { e.preventDefault(); alert("Il faut d'abord sanctuariser la destination (Semaine, Région, Gîte)."); } 
+    else setActiveTab(tabName);
+  };
+
+  // --- REPAS & COURSES --- (Logique inchangée)
+  const resetMealForm = () => { setEditingMealId(null); setMealDay('Samedi'); setMealType('Déjeuner'); setMealName(''); setMealStarter(''); setMealDessert(''); setMealDrinks(''); setMealRecipeLink(''); setMealCooks([]); setMealIngredients([{ name: '', qty: '' }]); setShowMealForm(false); };
+  const editMeal = (meal: Meal) => { setEditingMealId(meal.id); setMealDay(meal.day); setMealType(meal.type); setMealName(meal.name || ''); setMealStarter(meal.starter || ''); setMealDessert(meal.dessert || ''); setMealDrinks(meal.drinks || ''); setMealRecipeLink(meal.recipeLink || ''); setMealCooks(meal.cooks || []); setMealIngredients(meal.ingredients?.length ? meal.ingredients : [{ name: '', qty: '' }]); setShowMealForm(true); };
+  const handleSaveMeal = async () => { 
+    if (!mealName.trim()) return; 
+    const mealPayload = { trip_id: tripId, day: mealDay, type: mealType, name: mealName.trim(), starter: mealStarter.trim() || null, dessert: mealDessert.trim() || null, drinks: mealDrinks.trim() || null, recipe_link: mealRecipeLink.trim() || null }; 
+    let currentMealId = editingMealId; 
+    if (editingMealId) { 
+      await supabase.from('meals').update(mealPayload).eq('id', editingMealId); await supabase.from('meal_ingredients').delete().eq('meal_id', editingMealId); await supabase.from('meal_cooks').delete().eq('meal_id', editingMealId); 
+    } else { 
+      const { data } = await supabase.from('meals').insert([mealPayload]).select().single(); currentMealId = data?.id; 
+    } 
+    const ings = mealIngredients.filter(i => i.name.trim()).map(i => ({ meal_id: currentMealId, name: i.name.trim(), qty: i.qty.trim() || null })); 
+    if (ings.length > 0) await supabase.from('meal_ingredients').insert(ings); 
+    const cooks = mealCooks.map(id => ({ meal_id: currentMealId, user_id: id })); 
+    if (cooks.length > 0) await supabase.from('meal_cooks').insert(cooks); 
+    fetchTripData(); resetMealForm(); 
+  }
+  const handleDeleteMeal = async (id: string | number) => { await supabase.from('meals').delete().eq('id', id); fetchTripData(); }
+
+  const handleAddExtraItem = async (e: React.FormEvent) => { e.preventDefault(); if (!newExtraItem.trim()) return; await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); };
+  const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
+  const shoppingList = React.useMemo(() => {
+    const list: Record<string, any> = {}
+    meals.forEach(meal => {
+      meal.ingredients?.forEach(ing => {
+        if (!ing.name) return
+        const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-gray-100 text-gray-700';
+        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }] }
+        else { if (ing.qty && !list[key].qtys.includes(ing.qty)) list[key].qtys.push(ing.qty); if (!list[key].tags.some((t: any) => t.text === tagText)) list[key].tags.push({ text: tagText, color: tagColor }) }
+      })
+    })
+    extraItems.forEach(item => {
+      const key = item.name.toLowerCase().trim();
+      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true }
+      else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-gray-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
+    });
+    return Object.values(list).map(item => ({ ...item, displayQty: item.qtys.join(' + ') }))
+  }, [meals, extraItems])
+  const toggleCheck = (id: string) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }))
+
+  // --- ACTIVITÉS --- (Logique inchangée)
+  const resetActivityForm = () => { setEditingActivityId(null); setActTitle(''); setActDesc(''); setActPrice(''); setActLink(''); setActAddress(''); setActDay(''); setActTimeSlot(''); setShowActivityForm(false); }
+  const editActivity = (act: Activity) => { setEditingActivityId(act.id); setActTitle(act.title); setActDesc(act.description); setActPrice(act.price); setActLink(act.link || ''); setActAddress(act.address || ''); setActDay(act.day || ''); setActTimeSlot(act.timeSlot || ''); setShowActivityForm(true); }
+const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefault();
+    if (!actTitle.trim() || !currentUser) return; setIsSavingAct(true);
+    let lat = null, lng = null, durationStr = null;
+    if (actAddress.trim()) {
+      try {
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(actAddress)}`); const geo = await geoRes.json();
+        if (geo && geo.length > 0) {
+          lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon);
+          if (trip?.accommodation_lat && trip?.accommodation_lng) {
+            const osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${trip.accommodation_lng},${trip.accommodation_lat};${lng},${lat}?overview=false`); const osrmData = await osrmRes.json();
+            if (osrmData.routes && osrmData.routes.length > 0) {
+              const mins = Math.round(osrmData.routes[0].duration / 60);
+              if (mins < 60) durationStr = `${mins} min`; else { const h = Math.floor(mins / 60); const m = mins % 60; durationStr = `${h}h${m > 0 ? m.toString().padStart(2, '0') : ''}`; }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    const payload = { trip_id: tripId, title: actTitle, description: actDesc, price: actPrice === '' ? null : actPrice, link: actLink, address: actAddress.trim() || null, lat: lat, lng: lng, duration_from_acc: durationStr, day: actDay, time_slot: actTimeSlot, proposed_by: currentUser.id };
+    if (editingActivityId) await supabase.from('activities').update(payload).eq('id', editingActivityId); else await supabase.from('activities').insert([payload]);
+    await fetchTripData(); resetActivityForm(); setIsSavingAct(false);
+  }
+  const handleDeleteActivity = async (id: string | number) => { await supabase.from('activities').delete().eq('id', id); fetchTripData(); }
+  const handleActivityVote = async (actId: string | number, voteType: ActivityVote) => {
+    if (!currentUser) return; await supabase.from('activity_votes').upsert({ activity_id: actId, user_id: currentUser.id, vote: voteType }, { onConflict: 'activity_id, user_id' }); fetchTripData();
+  }
+
+  // --- DÉPENSES --- (Logique inchangée)
+  const resetExpenseForm = () => { setEditingExpenseId(null); setExpenseTitle(''); setExpenseAmount(''); setExpensePayer(currentUser?.id || ''); setExpenseSplitAmong(members.map(m => m.id)); setShowExpenseForm(false); };
+  const editExpense = (exp: any) => { setEditingExpenseId(exp.id); setExpenseTitle(exp.title); setExpenseAmount(exp.amount); setExpensePayer(exp.paidBy); setExpenseSplitAmong(exp.splitAmong); setShowExpenseForm(true); };
+  const handleSaveExpense = async () => {
+    if (!expenseTitle.trim() || !expenseAmount || Number(expenseAmount) <= 0 || expenseSplitAmong.length === 0 || !expensePayer) return alert("Remplir tous les champs !");
+    const payload = { trip_id: tripId, title: expenseTitle, amount: Number(expenseAmount), paid_by: expensePayer, split_among: expenseSplitAmong };
+    if (editingExpenseId) await supabase.from('expenses').update(payload).eq('id', editingExpenseId); else await supabase.from('expenses').insert([payload]);
+    fetchTripData(); resetExpenseForm();
+  };
+  const handleDeleteExpense = async (id: string | number) => { await supabase.from('expenses').delete().eq('id', id); fetchTripData(); };
+  const handleSettleDebt = async (payerId: string, receiverId: string, amount: number) => { if (!confirm("Confirmer le remboursement ?")) return; await supabase.from('settlements').insert([{ trip_id: tripId, payer_id: payerId, receiver_id: receiverId, amount: amount }]); fetchTripData(); };
+
+  const { balances, reimbursements, allKnownMembers } = React.useMemo(() => {
+    const userBalances: Record<string, number> = {}; const ghostMembers = [...members]; 
+    ghostMembers.forEach((m: Member) => userBalances[m.id] = 0);
+    const ensureMemberExists = (id: string) => { if (!id) return; if (userBalances[id] === undefined) { userBalances[id] = 0; ghostMembers.push({ id: id, name: 'Ancien membre 👻', avatar: '👤', role: 'member' }); } };
+    expenses.forEach(exp => { if (!exp.splitAmong || exp.splitAmong.length === 0) return; ensureMemberExists(exp.paidBy); exp.splitAmong.forEach(ensureMemberExists); const splitAmount = exp.amount / exp.splitAmong.length; if (exp.paidBy) userBalances[exp.paidBy] += exp.amount; exp.splitAmong.forEach(memberId => { userBalances[memberId] -= splitAmount; }); });
+    settlements.forEach(s => { ensureMemberExists(s.payer_id); ensureMemberExists(s.receiver_id); if (s.payer_id) userBalances[s.payer_id] += s.amount; if (s.receiver_id) userBalances[s.receiver_id] -= s.amount; });
+    const debtors = Object.entries(userBalances).filter(([_, b]) => b < -0.01).sort((a, b) => a[1] - b[1]); const creditors = Object.entries(userBalances).filter(([_, b]) => b > 0.01).sort((a, b) => b[1] - a[1]); const newReimbursements: { from: string, to: string, amount: number }[] = [];
+    let d = 0, c = 0; while (d < debtors.length && c < creditors.length) { const debtor = debtors[d]; const creditor = creditors[c]; const amount = Math.min(-debtor[1], creditor[1]); if (amount > 0.01) newReimbursements.push({ from: debtor[0], to: creditor[0], amount }); debtor[1] += amount; creditor[1] -= amount; if (debtor[1] > -0.01) d++; if (creditor[1] < 0.01) c++; }
+    return { balances: userBalances, reimbursements: newReimbursements, allKnownMembers: ghostMembers };
+  }, [members, expenses, settlements]);
+  const getMember = (id: string) => allKnownMembers.find(m => m.id === id) || { name: 'Ancien membre 👻', avatar: '👤' };
+
+// --- MEDIAS ---
+const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>) => { 
+    if (!e.target.files) return; 
+    const files = Array.from(e.target.files); 
+    
+    const newPending = await Promise.all(files.map(async (file) => {
+      return new Promise<PendingMedia>((resolve) => {
+        EXIF.getData(file as any, function(this: any) {
+          let lat = null, lng = null, autoDay = selectedSlotForMedia?.day || '', autoSlot = selectedSlotForMedia?.slot || '';
+          
+          const latData = EXIF.getTag(this, 'GPSLatitude');
+          const lngData = EXIF.getTag(this, 'GPSLongitude');
+          const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+          const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
+          
+          if (latData && lngData && latRef && lngRef && latData.length >= 3 && lngData.length >= 3) {
+            // CORRECTION : On divise chaque numérateur par son dénominateur pour avoir la vraie précision
+            const latDeg = latData[0].numerator / (latData[0].denominator || 1);
+            const latMin = latData[1].numerator / (latData[1].denominator || 1);
+            const latSec = latData[2].numerator / (latData[2].denominator || 1);
+            
+            lat = latDeg + (latMin / 60) + (latSec / 3600);
+            if (latRef === 'S') lat = -lat;
+
+            const lngDeg = lngData[0].numerator / (lngData[0].denominator || 1);
+            const lngMin = lngData[1].numerator / (lngData[1].denominator || 1);
+            const lngSec = lngData[2].numerator / (lngData[2].denominator || 1);
+            
+            lng = lngDeg + (lngMin / 60) + (lngSec / 3600);
+            if (lngRef === 'W') lng = -lng;
+          }
+
+          // Extraction Date et Heure pour le placement auto
+          const dateTime = EXIF.getTag(this, 'DateTimeOriginal');
+          if (dateTime && !selectedSlotForMedia) {
+            const [dateStr, timeStr] = dateTime.split(' ');
+            const [y, m, d] = dateStr.split(':');
+            const dateObj = new Date(Number(y), Number(m)-1, Number(d));
+            autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][dateObj.getDay()];
+            
+            const hour = parseInt(timeStr.split(':')[0]);
+            if (hour >= 6 && hour < 12) autoSlot = 'Matin';
+            else if (hour >= 12 && hour < 14) autoSlot = 'Déjeuner';
+            else if (hour >= 14 && hour < 19) autoSlot = 'Après-midi';
+            else if (hour >= 19 && hour < 22) autoSlot = 'Dîner';
+            else autoSlot = 'Soirée';
+          }
+
+          resolve({ id: Math.random().toString(36).substring(2), file, preview: URL.createObjectURL(file), day: autoDay, time_slot: autoSlot, lat, lng } as PendingMedia & { lat: number | null, lng: number | null });
+        });
+      });
+    }));
+
+    setPendingMediaItems(prev => [...prev, ...newPending]); 
+    e.target.value = ''; 
+  };
+  // RESTAURATION des fonctions manquantes
+  const updatePendingMedia = (id: string, field: 'day' | 'time_slot', value: string) => { setPendingMediaItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item)); };
+  const removePendingMedia = (id: string) => { setPendingMediaItems(prev => { const itemToRevoke = prev.find(item => item.id === id); if (itemToRevoke) URL.revokeObjectURL(itemToRevoke.preview); return prev.filter(item => item.id !== id); }); };
+  const closeMediaUploadModal = () => { pendingMediaItems.forEach(item => URL.revokeObjectURL(item.preview)); setPendingMediaItems([]); setShowMediaUploadModal(false); setSelectedSlotForMedia(null); };
+
+  // CORRECTION du payload d'envoi
+  const handleBulkMediaUpload = async () => { 
+    if (pendingMediaItems.length === 0) return; 
+    setIsUploading(true); 
+    try { 
+      const { data: { session } } = await supabase.auth.getSession(); 
+      if (!session) return; 
+      const uploadPromises = pendingMediaItems.map(async (item: any) => { 
+        const fileExt = item.file.name.split('.').pop(); 
+        const filePath = `${tripId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`; 
+        await supabase.storage.from('trip-media').upload(filePath, item.file); 
+        const { data } = supabase.storage.from('trip-media').getPublicUrl(filePath); 
+return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUrl, media_type: item.file.type.startsWith('video/') ? 'video' : 'image', day: item.day || null, time_slot: item.time_slot || null, lat: (item as any).lat || null, lng: (item as any).lng || null };      }); 
+      const dbPayloads = await Promise.all(uploadPromises); 
+      await supabase.from('media').insert(dbPayloads); 
+      fetchTripData(); 
+      closeMediaUploadModal(); 
+    } catch (error: any) {
+      alert("Erreur lors de l'envoi : " + error.message);
+    } finally { 
+      setIsUploading(false); 
+    } 
+  };
+
+  const handleDeleteMedia = async (id: string, url: string) => { if(!confirm("Es-tu sûr de vouloir supprimer cette photo définitivement ?")) return; try { const urlParts = url.split('/'); await supabase.storage.from('trip-media').remove([`${tripId}/${urlParts[urlParts.length - 1]}`]); await supabase.from('media').delete().eq('id', id); fetchTripData(); } catch (error: any) {} }; 
+  const openEditMedia = (media: MediaItem) => { setEditingMedia(media); setEditMediaDay(media.day || ''); setEditMediaSlot(media.time_slot || ''); };
+  const handleSaveMediaEdit = async () => { if (!editingMedia) return; await supabase.from('media').update({ day: editMediaDay || null, time_slot: editMediaSlot || null }).eq('id', editingMedia.id); fetchTripData(); setEditingMedia(null); };
+  if (loading && !trip) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
+  if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
+
+  return (
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
+      <aside className="hidden md:flex flex-col w-64 border-r bg-white shadow-sm z-10">
+        <div className="p-6">
+          <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-indigo-600 mb-4 transition-colors"><ChevronLeft size={14} /> Mes voyages</button>
+          <h1 className="text-xl font-black text-indigo-600 tracking-tight truncate">{trip.name}</h1>
+<button 
+  onClick={() => { 
+    const inviteLink = `${window.location.origin}/join/${trip.invite_code}`;
+    navigator.clipboard.writeText(inviteLink); 
+    alert("Lien d'invitation copié ! Envoie-le à tes potes 🚀"); 
+  }} 
+  className="mt-4 flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit group"
+>
+  <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien d'invitation
+</button>        </div>
+        
+        <nav className="flex-1 px-4 space-y-2 mt-2">
+          {/* L'onglet fusionné Destination */}
+          <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
+            {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+          </button>
+
+          <div className="pt-4 mt-4 border-t border-gray-100">
+            <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 px-2">Organisation</p>
+            <button onClick={(e) => checkLock('calendar', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'calendar' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><CalendarDays size={20} /> Planning</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('activities', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'activities' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Compass size={20} /> Activités</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('meals', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'meals' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Utensils size={20} /> Repas & Courses</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('expenses', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'expenses' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><PieChart size={20} /> Comptes</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('gallery', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'gallery' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Camera size={20} /> Galerie</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+          </div>
+        </nav>
+        <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
+      </aside>
+
+      <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+        <div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
+          <div><button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1"><ChevronLeft size={12} /> Retour</button><h1 className="font-black text-indigo-600 text-lg truncate max-w-[200px]">{trip.name}</h1></div>
+          <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Users size={16} /></button>
+        </div>       
+
+        <div className="p-4 md:p-8">
+          
+          {/* NOUVEL ONGLET FUSIONNÉ : DESTINATION */}
+{/* ONGLET DESTINATION (PHASÉ) */}
+          {activeTab === 'destination' && (
+            <div className="max-w-6xl mx-auto space-y-8">
+              
+              {!trip.trip_region ? (
+                // ================= PHASE 1 : SEMAINE & RÉGION =================
+                <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 to-blue-500"></div>
+                  <div className="mb-6">
+                    <h2 className="font-black text-2xl text-gray-800 mb-2">Étape 1 : Où et Quand ? 🌍</h2>
+                    <p className="text-gray-500 text-sm">Proposez et notez les zones géographiques. Le système valorise les choix qui font l'unanimité !</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
+                      <div className="space-y-3 mb-4">
+                        {proposedWeeks.sort((a, b) => b.votes.length - a.votes.length).map(w => (
+                          <div key={w.id} className="flex items-center justify-between bg-white p-3 rounded-xl border shadow-sm">
+                            <span className="font-semibold text-sm">{w.text}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
+                              <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <form onSubmit={handleSaveWeek} className="flex gap-2">
+                        <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Ex: Du 12 au 19 Août" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
+                        <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50"><Plus size={18}/></button>
+                      </form>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-indigo-600"/> La Zone Géo</h3>
+                      <div className="space-y-3 mb-4">
+                        {proposedRegions.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(r => {
+                          const stats = getRatingStats(r.ratings);
+                          return (
+                            <div key={r.id} className="bg-white p-3 rounded-xl border shadow-sm flex flex-col gap-2 relative group">
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
+                                {(isAdmin || r.by === currentUser?.id) && (
+                                  <><button onClick={() => startEditRegion(r)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button><button onClick={() => handleDeleteRegion(r.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button></>
+                                )}
+                              </div>
+                              <div className="flex justify-between items-center pr-12">
+                                <span className="font-semibold text-sm">{r.name}</span>
+                                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded" title={`Moyenne brute : ${stats.avg.toFixed(1)}\nDispersion (Écart type) : ${stats.sd.toFixed(2)}`}>
+                                  Score : {stats.consensus.toFixed(1)}
+                                </span>
+                              </div>
+                              <div className="flex gap-1">
+                                {[1,2,3,4,5].map(star => {
+                                  const myScore = currentUser && r.ratings[currentUser.id] ? r.ratings[currentUser.id] : 0;
+                                  return <button key={star} onClick={() => handleRegionRating(r.id, r.ratings, star)} className={myScore >= star ? 'text-yellow-400' : 'text-gray-300'}><Star size={20} fill={myScore >= star ? "currentColor" : "none"} /></button>
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <form onSubmit={handleSaveRegion} className="flex gap-2 relative">
+                        <input type="text" value={newRegion} onChange={e => setNewRegion(e.target.value)} placeholder="Ex: Bretagne Nord" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
+                        <button type="submit" disabled={!newRegion.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">{editingRegionId ? <Check size={18}/> : <Plus size={18}/>}</button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {isAdmin ? (
+                    <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                      <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Valider l'Étape 1 (Admin)</h3>
+                      <div className="flex flex-col md:flex-row gap-3 mb-4">
+                        <select value={lockWeek} onChange={e => setLockWeek(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Semaine gagnante --</option>{proposedWeeks.map(w => <option key={w.id} value={w.text}>{w.text}</option>)}</select>
+                        <select value={lockRegion} onChange={e => setLockRegion(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Région gagnante --</option>{proposedRegions.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}</select>
+                      </div>
+                      <button onClick={handleLockPhase1} disabled={isLocking} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Valider et passer au choix du Gîte</button>
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 text-orange-700 p-4 rounded-xl text-sm font-medium border border-orange-100 flex items-start gap-3"><Lock size={20} className="flex-shrink-0" /> Un administrateur doit valider la région avant de chercher les gîtes.</div>
+                  )}
+                </div>
+
+              ) : !isLocked ? (
+                // ================= PHASE 2 : RECHERCHE DE GÎTES =================
+                <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                  
+                  <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider mb-2">Étape 2</div>
+                      <h2 className="font-black text-2xl text-gray-800 leading-tight">Objectif : {trip.trip_region} 🏡</h2>
+                      <p className="text-gray-500 text-sm font-semibold">{trip.trip_week}</p>
+                    </div>
+                    {isAdmin && <button onClick={handleUnlockPhase1} className="text-xs font-bold text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors">Modifier région</button>}
+                  </div>
+
+                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 mb-8">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><Home size={18} className="text-indigo-600"/> Les Gîtes trouvés</h3>
+                      <button onClick={() => setShowPlaceForm(true)} className="text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:text-indigo-600"><Plus size={14}/> Proposer un gîte</button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        {proposedPlaces.length === 0 ? <div className="text-sm text-gray-400 italic">Aucune proposition.</div> : 
+                          proposedPlaces.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(p => {
+                            const stats = getRatingStats(p.ratings);
+                            return (
+                              <div key={p.id} className="bg-white p-4 rounded-xl border shadow-sm relative group overflow-hidden">
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
+                                  {(isAdmin || p.by === currentUser?.id) && (
+                                    <><button onClick={() => startEditPlace(p)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-indigo-600"><Pencil size={14}/></button><button onClick={() => handleDeletePlace(p.id)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></>
+                                  )}
+                                </div>
+                                <h4 className="font-bold text-gray-800 pr-14">{p.name} {p.link && <a href={p.link} target="_blank" className="text-indigo-500 ml-1"><ExternalLink size={12} className="inline"/></a>}</h4>
+                                <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                  {p.price && <span className="font-semibold text-orange-600">{p.price} €</span>}
+                                  {p.beds && <span>🛏️ {p.beds} pers.</span>}
+                                  {p.amenities && <span className="truncate max-w-[200px]">✨ {p.amenities}</span>}
+                                </div>
+                                
+                                <div className="mt-3 flex items-center justify-between border-t pt-3">
+                                  <div className="flex gap-1">
+                                    {[1,2,3,4,5].map(star => {
+                                      const myScore = currentUser && p.ratings[currentUser.id] ? p.ratings[currentUser.id] : 0;
+                                      return <button key={star} onClick={() => handlePlaceRating(p.id, p.ratings, star)} className={myScore >= star ? 'text-yellow-400' : 'text-gray-200'}><Star size={20} fill={myScore >= star ? "currentColor" : "none"} /></button>
+                                    })}
+                                  </div>
+                                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded" title={`Moy: ${stats.avg.toFixed(1)} | Dispersion: ${stats.sd.toFixed(2)}`}>
+                                    Consensus : {stats.consensus.toFixed(1)}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })
+                        }
+                      </div>
+                      <MapView proposedGites={proposedPlaces} photos={mediaItems}/>
+                    </div>
+                  </div>
+
+                  {isAdmin ? (
+                    <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                      <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Sanctuariser le Gîte (Admin)</h3>
+                      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                        <select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>
+                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
+                      </div>
+                      <p className="text-xs text-indigo-500 font-medium">Le verrouillage débloquera l'accès au planning, repas, activités et comptes pour tout le groupe.</p>
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 text-orange-700 p-4 rounded-xl text-sm font-medium border border-orange-100 flex items-start gap-3"><Lock size={20} className="flex-shrink-0" /> Un administrateur doit choisir le gîte final pour débloquer l'organisation.</div>
+                  )}
+                </div>
+
+              ) : (
+                // ================= PHASE 3 : VOYAGE VERROUILLÉ =================
+                <div className="space-y-6">
+                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-indigo-100 shadow-md relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider mb-3"><Check size={12} /> Destination Sanctuarisée</div>
+                        <h3 className="font-black text-3xl text-gray-800 tracking-tight">{trip.trip_region}</h3>
+                        <p className="text-gray-500 mt-1 font-bold">{trip.trip_week}</p>
+                      </div>
+                      {isAdmin && <button onClick={handleUnlockTrip} className="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 p-2 rounded-xl transition-colors" title="Déverrouiller"><Unlock size={18} /></button>}
+                    </div>
+
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="font-bold text-gray-800 text-lg flex items-center gap-2"><Home size={20} className="text-indigo-600"/> {trip.accommodation_name}</div>
+                        <div className="text-sm text-gray-500 flex items-center gap-1 mt-1"><MapPin size={14}/> {trip.accommodation_address}</div>
+                      </div>
+                      <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(trip.accommodation_address)}`} target="_blank" rel="noreferrer" className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap"><MapIcon size={16}/> Ouvrir le GPS</a>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-gray-50">
+                      <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte Logistique</div>
+<MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+{/* FORMULAIRE GÎTE */}
+          {showPlaceForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <form onSubmit={handleSavePlace} className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4">
+                <div className="flex justify-between items-center"><h3 className="font-bold text-lg text-gray-800">{editingPlaceId ? "Modifier le Gîte" : "Proposer un Gîte"}</h3><button type="button" onClick={() => {setShowPlaceForm(false); setEditingPlaceId(null); setPlaceData({name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null, lng: null});}} className="text-gray-400"><X size={20}/></button></div>
+                <input type="text" value={placeData.name} onChange={e => setPlaceData({...placeData, name: e.target.value})} placeholder="Nom du gîte *" className="w-full px-3 py-2 border rounded-xl text-sm" />
+                <input type="text" value={placeData.address} onChange={e => setPlaceData({...placeData, address: e.target.value})} placeholder="Adresse exacte (Pour la carte) *" className="w-full px-3 py-2 border rounded-xl text-sm" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="number" value={placeData.price} onChange={e => setPlaceData({...placeData, price: e.target.value})} placeholder="Prix total (€)" className="w-full px-3 py-2 border rounded-xl text-sm" />
+                  <input type="number" value={placeData.beds} onChange={e => setPlaceData({...placeData, beds: e.target.value})} placeholder="Nb. Couchages" className="w-full px-3 py-2 border rounded-xl text-sm" />
+                </div>
+                <input type="text" value={placeData.amenities} onChange={e => setPlaceData({...placeData, amenities: e.target.value})} placeholder="Atouts (Ex: Piscine, BBQ, Fibre)" className="w-full px-3 py-2 border rounded-xl text-sm" />
+                <input type="url" value={placeData.link} onChange={e => setPlaceData({...placeData, link: e.target.value})} placeholder="Lien (Airbnb, Booking...)" className="w-full px-3 py-2 border rounded-xl text-sm text-indigo-600" />
+                <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold mt-2">Enregistrer</button>
+              </form>
+            </div>
+          )}
+          {/* PLANNING (Avec Météo) */}
+          {activeTab === 'calendar' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <h2 className="text-2xl font-bold text-gray-800">Planning de la semaine</h2>
+              
+              {weather && isLocked && (
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-5 text-white shadow-md flex overflow-x-auto gap-4 snap-x hide-scrollbar">
+                  <div className="flex items-center gap-3 pr-4 border-r border-white/20 shrink-0">
+                    <CloudSun size={36} className="text-blue-100" />
+                    <div><div className="font-black text-lg">Météo</div><div className="text-xs text-blue-100 max-w-[120px] truncate">{trip.accommodation_name}</div></div>
+                  </div>
+                  {weather.map((day, i) => {
+                    const dateObj = new Date(day.date); const dayName = dateObj.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''); const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                    return (
+                      <div key={i} className="flex flex-col items-center justify-center shrink-0 bg-white/10 px-4 py-2 rounded-2xl snap-start">
+                        <span className="text-xs font-bold text-blue-100">{capDay} {dateObj.getDate()}</span>
+                        <span className="text-3xl my-1">{getWeatherIcon(day.code)}</span>
+                        <span className="text-sm font-black">{Math.round(day.max)}° <span className="text-blue-200 font-medium ml-1">{Math.round(day.min)}°</span></span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {WEEK_DAYS.map(day => (
+                  <div key={day} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-50 flex items-center justify-between"><span className="font-black text-indigo-800 text-lg uppercase tracking-tight">{day}</span></div>
+                    <div className="divide-y divide-gray-50">
+                      {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(slot => {
+                        const slotMeals = meals.filter(m => m.day === day && m.type === slot);
+                        const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
+                        const slotMedia = mediaItems.filter(m => m.day === day && m.time_slot === slot);
+
+                        return (
+                          <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
+                            <div className="w-32 flex-shrink-0 flex flex-col gap-2">
+                              <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
+                              <button onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} className={`text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors w-fit shadow-sm border ${slotMedia.length > 0 ? 'bg-indigo-50 border-indigo-100 text-indigo-600 font-bold' : 'bg-white border-gray-200 text-gray-400 font-medium'}`}><Camera size={12} /> {slotMedia.length > 0 ? `${slotMedia.length} photo(s)` : 'Photos'}</button>
+                            </div>
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {slotMeals.map(meal => (
+                                <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
+                              ))}
+                              {slotActivities.map(act => (
+                                <div key={`act-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
+                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                                  <div className="flex justify-between items-start">
+                                    <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
+                                    {act.address && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(act.address)}`} target="_blank" rel="noreferrer" title="Lancer le GPS" className="bg-white p-1.5 rounded-lg border text-indigo-500 hover:bg-indigo-50"><MapIcon size={14} /></a>}
+                                  </div>
+                                  {act.durationFromAcc && <div className="mt-2 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-1.5 py-0.5 rounded flex items-center gap-1"><Car size={10}/> {act.durationFromAcc}</div>}
+                                </div>
+                              ))}
+                              {slotMeals.length === 0 && slotActivities.length === 0 && <div className="text-gray-300 text-sm font-medium italic">Quartier libre...</div>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'activities' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-gray-800">Boîte à idées</h2><button onClick={() => { resetActivityForm(); setShowActivityForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Proposer</button></div>
+              {trip?.accommodation_lat && trip?.accommodation_lng && (
+                <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-white shadow-sm mb-6">
+                  <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte des activités</div>
+<MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {activities.map(act => (
+                  <div key={act.id} className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col group relative">
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100"><button onClick={() => editActivity(act)} className="p-1 bg-white border rounded"><Pencil size={14}/></button><button onClick={() => handleDeleteActivity(act.id)} className="p-1 bg-white border rounded text-red-500"><Trash2 size={14}/></button></div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">{act.title} {act.link && <a href={act.link} target="_blank" className="text-indigo-500"><ExternalLink size={14} className="inline"/></a>}</h3>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {act.price && <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">{act.price} €</span>}
+                      {act.durationFromAcc && <span className="text-xs font-bold text-orange-700 bg-orange-50 px-2 py-1 rounded flex items-center gap-1" title="Temps de route"><Car size={12}/> {act.durationFromAcc}</span>}
+                    </div>
+                    {act.address && (
+                      <p className="text-xs text-gray-500 mb-2 flex items-start gap-1"><MapPin size={12} className="flex-shrink-0 mt-0.5" /> <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(act.address)}`} target="_blank" className="hover:text-indigo-600">{act.address}</a></p>
+                    )}
+                    <p className="text-sm text-gray-600 mb-4 flex-1">{act.description}</p>
+                    <div className="flex gap-2 mb-3">
+                      <button onClick={() => handleActivityVote(act.id, 'yes')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${currentUser && act.votes[currentUser.id] === 'yes' ? 'bg-green-500 text-white' : 'text-gray-500'}`}>Partant</button>
+                      <button onClick={() => handleActivityVote(act.id, 'maybe')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${currentUser && act.votes[currentUser.id] === 'maybe' ? 'bg-orange-400 text-white' : 'text-gray-500'}`}>Peut-être</button>
+                      <button onClick={() => handleActivityVote(act.id, 'no')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${currentUser && act.votes[currentUser.id] === 'no' ? 'bg-red-500 text-white' : 'text-gray-500'}`}>Non</button>
+                    </div>
+                    {Object.keys(act.votes).length > 0 && (
+                      <div className="flex gap-3 min-h-[24px]">
+                        {['yes', 'maybe', 'no'].map(vType => {
+                          const voters = Object.entries(act.votes).filter(([_, v]) => v === vType); if (voters.length === 0) return null;
+                          const c = { yes: 'border-green-400 bg-green-50', maybe: 'border-orange-300 bg-orange-50', no: 'border-red-400 bg-red-50' };
+                          return <div key={vType} className="flex -space-x-1.5">{voters.map(([uId]) => { const m = getMember(uId); return m ? <div key={uId} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[9px] font-bold ${c[vType as ActivityVote]}`}>{m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover rounded-full" /> : m.avatar}</div> : null; })}</div>
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {showActivityForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                  <form onSubmit={handleSaveActivity} className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4">
+                    <div className="flex justify-between"><h3 className="font-bold">{editingActivityId ? "Modifier" : "Nouvelle Activité"}</h3><button onClick={resetActivityForm}><X size={18}/></button></div>
+                    <input type="text" value={actTitle} onChange={e => setActTitle(e.target.value)} placeholder="Titre *" className="w-full px-3 py-2 border rounded-xl"/>
+                    <input type="text" value={actAddress} onChange={e => setActAddress(e.target.value)} placeholder="Adresse exacte (Pour le calcul GPS)" className="w-full px-3 py-2 border rounded-xl"/>
+                    <textarea value={actDesc} onChange={e => setActDesc(e.target.value)} placeholder="Description" className="w-full px-3 py-2 border rounded-xl h-24"/>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select value={actDay} onChange={e => setActDay(e.target.value)} className="border rounded-xl px-3 py-2 bg-white"><option value="">Jour</option>{WEEK_DAYS.map(d=><option key={d}>{d}</option>)}</select>
+                      <select value={actTimeSlot} onChange={e => setActTimeSlot(e.target.value)} className="border rounded-xl px-3 py-2 bg-white"><option value="">Horaire</option><option value="Matin">Matin</option><option value="Déjeuner">Déjeuner</option><option value="Après-midi">Après-midi</option><option value="Dîner">Dîner</option><option value="Soirée">Soirée</option><option value="Journée entière">Journée entière</option></select>
+                      <input type="number" value={actPrice} onChange={e => setActPrice(e.target.value)} placeholder="Prix (€)" className="border rounded-xl px-3 py-2"/>
+                      <input type="url" value={actLink} onChange={e => setActLink(e.target.value)} placeholder="Lien Web" className="border rounded-xl px-3 py-2"/>
+                    </div>
+                    <button type="submit" disabled={isSavingAct} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">{isSavingAct ? <Loader2 size={18} className="animate-spin" /> : "Valider"}</button>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'meals' && (
+            <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
+              <div className="flex-1 space-y-6">
+                <h2 className="text-2xl font-bold text-gray-800">Planning des repas</h2>
+                <div className="space-y-4">
+                  {WEEK_DAYS.map(day => (
+                    <div key={day} className="bg-white rounded-2xl border shadow-sm">
+                      <div className="bg-gray-50 px-4 py-2 border-b font-bold text-gray-700">{day}</div>
+                      <div className="divide-y">
+                        {['Déjeuner', 'Dîner'].map(type => {
+                          const meal = meals.find(m => m.day === day && m.type === type);
+                          const mealActivities = activities.filter(a => a.day === day && (a.timeSlot === type || (a.timeSlot === 'Journée entière' && type === 'Déjeuner')));
+                          return (
+                            <div key={type} className="p-4 flex flex-col md:flex-row gap-4">
+                              <div className="w-24 text-sm text-gray-400 font-semibold">{type}</div>
+                              <div className="flex-1 space-y-3">
+                                {meal && (
+                                  <div className="group relative bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
+                                    <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-2"><button onClick={() => editMeal(meal)} className="p-1 border rounded bg-white text-gray-400 hover:text-indigo-600"><Pencil size={14}/></button><button onClick={() => handleDeleteMeal(meal.id)} className="p-1 border rounded bg-white text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></div>
+                                    <h3 className="font-bold text-lg mb-2">🍲 {meal.name} {meal.recipeLink && <a href={meal.recipeLink} target="_blank" className="text-indigo-500 text-xs"><ExternalLink size={10} className="inline"/></a>}</h3>
+                                    <div className="text-sm text-gray-500 space-y-1 mb-3">{meal.starter && <div>🥗 {meal.starter}</div>} {meal.dessert && <div>🍰 {meal.dessert}</div>} {meal.drinks && <div>🥂 {meal.drinks}</div>}</div>
+                                    <div className="flex gap-2">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
+                                  </div>
+                                )}
+                                {mealActivities.map(act => (
+                                  <div key={`act-meal-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('activities')}>
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> Activité / Resto</div><div className="font-bold text-gray-800 text-sm">{act.title}</div>
+                                  </div>
+                                ))}
+                                {!meal && (
+                                  <button onClick={() => { resetMealForm(); setMealDay(day); setMealType(type); setShowMealForm(true); }} className={`w-full border-2 border-dashed rounded-xl flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 ${mealActivities.length > 0 ? 'h-10 text-xs' : 'h-12 text-sm'}`}><Plus size={14} className="mr-2" /> {mealActivities.length > 0 ? 'Ajouter quand même un repas' : 'Ajouter un repas'}</button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full lg:w-96">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
+                  <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-indigo-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
+                  <form onSubmit={handleAddExtraItem} className="flex gap-2 mb-4">
+                    <input type="text" value={newExtraItem} onChange={e => setNewExtraItem(e.target.value)} placeholder="Article libre (Bières)" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
+                    <input type="text" value={newExtraQty} onChange={e => setNewExtraQty(e.target.value)} placeholder="Qté" className="w-16 border rounded-xl px-2 py-2 text-sm" />
+                    <button type="submit" className="bg-indigo-600 text-white p-2 rounded-xl"><Plus size={18}/></button>
+                  </form>
+                  <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                    {shoppingList.map((item, idx) => (
+                      <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer border group ${checkedItems[item.id] ? 'bg-gray-50 opacity-50' : 'hover:border-indigo-100'}`}>
+                        <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
+                        <div className="flex-1">
+                          <div className="flex justify-between"><span className={`text-sm font-semibold ${checkedItems[item.id] ? 'line-through' : ''}`}>{item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}</span> {item.isExtra && <button onClick={(e) => handleDeleteExtraItem(item.dbId, e)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}</div>
+                          <div className="flex flex-wrap gap-1 mt-1">{item.tags.map((t:any, i:number) => <span key={i} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${t.color}`}>{t.text}</span>)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {showMealForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                  <div className="bg-white w-full max-w-md rounded-2xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+                    <div className="p-5 border-b flex justify-between"><h3 className="font-bold text-lg">{editingMealId ? 'Modifier le repas' : 'Nouveau repas'}</h3><button onClick={resetMealForm}><X size={18}/></button></div>
+                    <div className="p-5 overflow-y-auto space-y-4">
+                      <div className="font-bold text-indigo-700 bg-indigo-50 p-2 rounded">{mealDay} • {mealType}</div>
+                      <input type="text" value={mealName} onChange={e => setMealName(e.target.value)} placeholder="Plat principal *" className="w-full px-3 py-2 border rounded-xl" autoFocus />
+                      <div className="grid grid-cols-2 gap-3"><input type="text" value={mealStarter} onChange={e => setMealStarter(e.target.value)} placeholder="Entrée" className="border rounded-xl px-3 py-2" /><input type="text" value={mealDessert} onChange={e => setMealDessert(e.target.value)} placeholder="Dessert" className="border rounded-xl px-3 py-2" /></div>
+                      <input type="text" value={mealDrinks} onChange={e => setMealDrinks(e.target.value)} placeholder="Boissons" className="w-full border rounded-xl px-3 py-2" />
+                      <input type="url" value={mealRecipeLink} onChange={e => setMealRecipeLink(e.target.value)} placeholder="Lien Recette (Web)" className="w-full border rounded-xl px-3 py-2 text-indigo-600" />
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">Ingrédients</label>
+                        {mealIngredients.map((ing, idx) => (
+                          <div key={idx} className="flex gap-2 mb-2">
+                            <input type="text" value={ing.name} onChange={e => { const i = [...mealIngredients]; i[idx].name = e.target.value; setMealIngredients(i); }} placeholder="Ingrédient" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
+                            <input type="text" value={ing.qty} onChange={e => { const i = [...mealIngredients]; i[idx].qty = e.target.value; setMealIngredients(i); }} placeholder="Qté" className="w-16 border rounded-xl px-2 py-2 text-sm" />
+                            <button onClick={() => setMealIngredients(mealIngredients.filter((_, i) => i !== idx))} className="text-red-400 p-2"><Trash2 size={16}/></button>
+                          </div>
+                        ))}
+                        <button onClick={() => setMealIngredients([...mealIngredients, {name:'', qty:''}])} className="text-indigo-600 text-xs font-bold flex items-center gap-1"><Plus size={12}/> Ajouter un ingrédient</button>
+                      </div>
+                    </div>
+                    <div className="p-5 border-t"><button onClick={handleSaveMeal} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'expenses' && (
+            <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
+              <div className="w-full lg:w-1/3 space-y-6">
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm sticky top-6">
+                  <h3 className="font-bold text-lg mb-4 flex gap-2"><PieChart size={18} className="text-indigo-600"/> Soldes</h3>
+                  <div className="space-y-2">
+                    {allKnownMembers.map(m => {
+                      const b = balances[m.id] || 0;
+                      return (
+                        <div key={m.id} className="flex justify-between items-center p-2 rounded hover:bg-gray-50">
+                          <div className="flex gap-2 items-center"><div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs">{m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover rounded-full" /> : m.avatar}</div> <span className="text-sm font-semibold">{m.name}</span></div>
+                          <span className={`font-bold text-sm ${b > 0.01 ? 'text-green-600' : b < -0.01 ? 'text-red-600' : 'text-gray-400'}`}>{b > 0 ? '+' : ''}{b.toFixed(2)} €</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {reimbursements.length > 0 && (
+                    <div className="mt-6 border-t pt-4">
+                      <h4 className="text-xs font-bold text-gray-400 mb-3 uppercase">Remboursements</h4>
+                      {reimbursements.map((r, idx) => (
+                        <div key={idx} className="flex flex-col gap-2 mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="flex justify-between items-center text-sm">
+                            <span>{getMember(r.from)?.name} <ArrowRight size={12} className="inline mx-1"/> {getMember(r.to)?.name}</span>
+                            <span className="font-bold text-indigo-600">{r.amount.toFixed(2)} €</span>
+                          </div>
+                          <button onClick={() => handleSettleDebt(r.from, r.to, r.amount)} className="w-full bg-green-100 text-green-700 hover:bg-green-200 py-1.5 rounded-lg font-bold transition-colors shadow-sm flex items-center justify-center gap-2 text-xs"><Check size={14} /> Marquer comme remboursé</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-4">
+                <div className="flex justify-between items-center"><h2 className="text-2xl font-bold">Dépenses</h2><button onClick={() => { resetExpenseForm(); setShowExpenseForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Ajouter</button></div>
+                {expenses.length === 0 ? <div className="text-center p-8 bg-white rounded-xl border text-gray-400">Aucune dépense.</div> : (
+                  expenses.map(exp => (
+                    <div key={exp.id} className="bg-white p-4 rounded-xl border shadow-sm flex justify-between relative group">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1"><button onClick={() => editExpense(exp)} className="p-1"><Pencil size={14}/></button><button onClick={() => handleDeleteExpense(exp.id)} className="p-1 text-red-500"><Trash2 size={14}/></button></div>
+                      <div>
+                        <h3 className="font-bold">{exp.title}</h3>
+                        <p className="text-xs text-gray-500 mt-1">Par {getMember(exp.paidBy)?.name} • Divisé en {exp.splitAmong.length}</p>
+                      </div>
+                      <div className="text-lg font-black text-indigo-600">{exp.amount.toFixed(2)} €</div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {showExpenseForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                  <div className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4">
+                    <div className="flex justify-between"><h3 className="font-bold">{editingExpenseId ? 'Modifier' : 'Ajouter'}</h3><button onClick={resetExpenseForm}><X size={18}/></button></div>
+                    <input type="text" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} placeholder="Titre" className="w-full border rounded-xl px-3 py-2" />
+                    <input type="number" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value ? Number(e.target.value) : '')} placeholder="Montant (€)" className="w-full border rounded-xl px-3 py-2" />
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Payé par</label>
+                      <select value={expensePayer} onChange={e => setExpensePayer(e.target.value)} className="w-full border rounded-xl px-3 py-2 bg-white">
+                        <option value="" disabled>Sélectionner...</option>
+                        {allKnownMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold text-gray-500 mb-1"><label>Pour qui ?</label><button onClick={() => setExpenseSplitAmong(expenseSplitAmong.length === allKnownMembers.length ? [] : allKnownMembers.map(m => m.id))} className="text-indigo-600">Tout cocher</button></div>
+                      <div className="flex flex-wrap gap-2">
+                        {allKnownMembers.map(m => {
+                          const isInc = expenseSplitAmong.includes(m.id);
+                          return <button key={m.id} onClick={() => setExpenseSplitAmong(isInc ? expenseSplitAmong.filter(id => id !== m.id) : [...expenseSplitAmong, m.id])} className={`px-2 py-1 rounded border text-xs font-medium ${isInc ? 'bg-indigo-600 text-white' : 'bg-gray-50'}`}>{m.name}</button>
+                        })}
+                      </div>
+                    </div>
+                    <button onClick={handleSaveExpense} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* GALERIE (Code inchangé visuellement, tronqué pour la concision de la carte) */}
+          {activeTab === 'gallery' && (
+            <div className="max-w-6xl mx-auto space-y-6 relative">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <h2 className="text-2xl font-bold text-gray-800">Souvenirs 📸</h2>
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button onClick={() => setGallerySortMode('date')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'date' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Récents</button>
+                    <button onClick={() => setGallerySortMode('moment')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'moment' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Par moment</button>
+                  </div>
+                  <button onClick={() => setShowMediaUploadModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-indigo-700 shadow-sm"><Plus size={18} /> Ajouter</button>
+                </div>
+              </div>
+              
+              {mediaItems.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 text-gray-400"><Camera size={48} className="mx-auto mb-4 text-gray-300" /><p>Aucun souvenir pour le moment.</p></div>
+              ) : (
+                gallerySortMode === 'date' ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {mediaItems.map((media, idx) => (
+                      <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                        {media.media_type === 'video' ? (
+                          <><video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(mediaItems, idx)} /><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white"><Play size={20} fill="currentColor" /></div></div></>
+                        ) : (<img src={media.file_path} alt="Souvenir" onClick={() => openViewer(mediaItems, idx)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />)}
+                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10"><button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-indigo-600"><Pencil size={14} /></button><button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button></div>                        
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].flatMap(slot => WEEK_DAYS.map(day => ({ day, slot, items: mediaItems.filter(m => m.day === day && m.time_slot === slot) }))).filter(g => g.items.length > 0).map((group, idx) => (
+                      <div key={idx} className="space-y-3">
+                        <h3 className="font-bold text-gray-700 flex items-center gap-2 border-b border-gray-100 pb-2"><Calendar size={18} className="text-indigo-500" /> {group.day} • {group.slot} </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {group.items.map((media, idx) => (
+                            <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                              {media.media_type === 'video' ? ( 
+                                <><video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(group.items, idx)} /><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white"><Play size={20} fill="currentColor" /></div></div></>
+                              ) : (<img src={media.file_path} alt="Souvenir" onClick={() => openViewer(group.items, idx)} className="w-full h-full object-cover cursor-pointer" /> )}
+                              <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 text-white px-2 py-1.5 rounded-lg text-[10px] font-bold">Par {getMember(media.uploader_id)?.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+          
+{/* === MODALE D'ENVOI MULTIPLE AVEC SÉLECTION === */}
+          {showMediaUploadModal && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-5 max-h-[90vh] flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-lg text-gray-800">Ajouter des souvenirs</h3>
+                  <button onClick={closeMediaUploadModal} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+                </div>
+                
+                <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelectionForBulk} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 mb-4 shrink-0"/>
+                
+                {/* Liste des photos en attente avec leurs menus déroulants */}
+                <div className="overflow-y-auto space-y-3 mb-4 flex-1 pr-2">
+                  {pendingMediaItems.map(item => (
+                    <div key={item.id} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <img src={item.preview} className="w-16 h-16 object-cover rounded-lg shrink-0" alt="Aperçu" />
+                      <div className="flex-1 w-full grid grid-cols-2 gap-2">
+                        <select value={item.day} onChange={e => updatePendingMedia(item.id, 'day', e.target.value)} className="border rounded-lg px-2 py-2 text-xs bg-white text-gray-700">
+                          <option value="">Jour (Optionnel)</option>{WEEK_DAYS.map(d=><option key={d}>{d}</option>)}
+                        </select>
+                        <select value={item.time_slot} onChange={e => updatePendingMedia(item.id, 'time_slot', e.target.value)} className="border rounded-lg px-2 py-2 text-xs bg-white text-gray-700">
+                          <option value="">Moment (Optionnel)</option>{['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].map(s=><option key={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={() => removePendingMedia(item.id)} className="text-red-400 hover:text-red-600 p-2 bg-white rounded-lg border border-red-100 shadow-sm"><Trash2 size={16}/></button>
+                    </div>
+                  ))}
+                </div>
+
+                <button onClick={handleBulkMediaUpload} disabled={isUploading || pendingMediaItems.length === 0} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold shrink-0 shadow-md disabled:opacity-50 transition-all">{isUploading ? 'Envoi en cours...' : 'Envoyer les fichiers'}</button>
+              </div>
+            </div>
+          )}
+
+          {/* === MODALE DE MODIFICATION D'UNE PHOTO EXISTANTE === */}
+          {editingMedia && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-gray-800">Classer ce souvenir</h3>
+                  <button onClick={() => setEditingMedia(null)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
+                </div>
+                <select value={editMediaDay} onChange={e => setEditMediaDay(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="">Aucun jour défini</option>{WEEK_DAYS.map(d => <option key={d}>{d}</option>)}
+                </select>
+                <select value={editMediaSlot} onChange={e => setEditMediaSlot(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="">Aucun moment défini</option>
+                  {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].map(s => <option key={s}>{s}</option>)}
+                </select>
+                <button onClick={handleSaveMediaEdit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-colors">Enregistrer</button>
+              </div>
+            </div>
+          )}
+          {viewerCurrentIndex !== null && viewerItems.length > 0 && (
+            <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center backdrop-blur-md">
+              <button onClick={closeViewer} className="absolute top-4 right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><X size={24} /></button>
+              {viewerItems.length > 1 && ( <><button onClick={prevMedia} className="absolute left-4 p-3 bg-white/10 rounded-full text-white z-[210]"><ChevronLeft size={32} /></button><button onClick={nextMedia} className="absolute right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><ChevronRight size={32} /></button></>)}
+              <div className="relative flex items-center justify-center w-[90vmin] h-[90vmin]">
+                {viewerItems[viewerCurrentIndex].media_type === 'video' ? (<video src={viewerItems[viewerCurrentIndex].file_path} controls autoPlay className="max-w-full max-h-full object-contain" style={{ transform: `rotate(${viewerRotation}deg)`}} />) : (<img src={viewerItems[viewerCurrentIndex].file_path} className="max-w-full max-h-full object-contain" style={{ transform: `rotate(${viewerRotation}deg)`}} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-3 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}><div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div><span className="text-[10px] mt-1">Destination</span></button>
+        <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'calendar' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><CalendarDays size={20} /><span className="text-[10px] mt-1">Planning</span></button>
+        <button onClick={(e) => checkLock('activities', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'activities' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><Compass size={20} /><span className="text-[10px] mt-1">Activités</span></button>
+        <button onClick={(e) => checkLock('meals', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'meals' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><Utensils size={20} /><span className="text-[10px] mt-1">Repas</span></button>
+        <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'expenses' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><PieChart size={20} /><span className="text-[10px] mt-1">Comptes</span></button>
+      </nav>
+    </div>
+  )
+}
