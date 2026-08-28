@@ -202,14 +202,14 @@ const [newWeek, setNewWeek] = useState('')
       if (tripError) throw tripError
       setTrip(tripData)
 
-      const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId)
+const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
       if (wData) setProposedWeeks(wData.map((w:any) => ({id: w.id, text: w.week_text, votes: w.votes || [], by: w.proposed_by})))
 
-      const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId)
-      if (rData) setProposedRegions(rData.map((r:any) => ({id: r.id, name: r.name, ratings: r.ratings || {}, by: r.proposed_by})))
+const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+        if (rData) setProposedRegions(rData.map((r:any) => ({id: r.id, name: r.name, ratings: r.ratings || {}, by: r.proposed_by})))
 
-      const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId)
-      if (pData) setProposedPlaces(pData.map((p:any) => ({id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, beds: p.beds, amenities: p.amenities, link: p.link, ratings: p.ratings || {}, by: p.proposed_by})))
+const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+          if (pData) setProposedPlaces(pData.map((p:any) => ({id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, beds: p.beds, amenities: p.amenities, link: p.link, ratings: p.ratings || {}, by: p.proposed_by})))
       
       const { data: settlementsData } = await supabase.from('settlements').select('*').eq('trip_id', tripId)
       setSettlements(settlementsData || [])
