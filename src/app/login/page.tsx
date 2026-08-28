@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import { Compass, Loader2, Mail, Lock, User } from 'lucide-react'
+import { Compass, Loader2, Lock, User } from 'lucide-react'
 import { Suspense } from 'react'
 
 function LoginContent() {
@@ -12,7 +12,7 @@ function LoginContent() {
   const returnTo = searchParams.get('returnTo') || '/'
   const [isLogin, setIsLogin] = useState(true)
   const [pseudo, setPseudo] = useState('')
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('') // Remplacement de 'email' pour accepter email ou pseudo
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -24,14 +24,29 @@ function LoginContent() {
 
     try {
       if (isLogin) {
+        let emailToLogin = identifier.trim()
+
+        // Si l'utilisateur n'a pas tapé d'e-mail (pas de '@'), on cherche l'e-mail correspondant au pseudo
+        if (!emailToLogin.includes('@')) {
+          const { data: fetchedEmail, error: rpcError } = await supabase.rpc('get_email_by_username', {
+            p_username: emailToLogin
+          })
+
+          if (rpcError || !fetchedEmail) {
+            throw new Error("Aucun compte trouvé avec ce pseudo ou cet e-mail.")
+          }
+          emailToLogin = fetchedEmail
+        }
+
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
+          email: emailToLogin,
           password,
         })
         if (signInError) throw signInError
-    router.push(returnTo)      
-  } else {
+        router.push(returnTo)      
+      } else {
         if (!pseudo.trim()) throw new Error("Le pseudo est obligatoire.")
+        if (!identifier.trim()) throw new Error("L'adresse email est obligatoire.")
 
         // Vérifier si le pseudo existe déjà dans la base
         const { data: existingUser } = await supabase
@@ -45,7 +60,7 @@ function LoginContent() {
         }
 
         const { error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: identifier.trim(),
           password,
           options: {
             data: { pseudo: pseudo.trim() } // Envoie le pseudo à Supabase
@@ -55,7 +70,7 @@ function LoginContent() {
         router.push(returnTo)
       }
     } catch (err: any) {
-      setError(err.message === "Invalid login credentials" ? "Email ou mot de passe incorrect." : err.message)
+      setError(err.message === "Invalid login credentials" ? "Identifiant ou mot de passe incorrect." : err.message)
     } finally {
       setLoading(false)
     }
@@ -102,17 +117,19 @@ function LoginContent() {
             )}
 
             <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Adresse Email</label>
+              <label className="block text-xs font-bold uppercase text-gray-500 mb-2">
+                {isLogin ? "Adresse Email ou Pseudo" : "Adresse Email"}
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                  <Mail size={18} />
+                  <User size={18} />
                 </div>
                 <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text" // Changé de 'email' à 'text' pour accepter les pseudos sans '@' lors du login
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
-                  placeholder="toi@exemple.com"
+                  placeholder={isLogin ? "Ton email ou ton pseudo" : "toi@exemple.com"}
                   required
                 />
               </div>
@@ -159,6 +176,7 @@ function LoginContent() {
     </div>
   )
 }
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Chargement...</div>}>

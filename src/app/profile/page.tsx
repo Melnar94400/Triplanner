@@ -103,7 +103,20 @@ export default function ProfilePage() {
       setSaving(false)
     }
     }
+const [newPassword, setNewPassword] = useState('')
 
+const handlePasswordChange = async (e: React.FormEvent) => {
+  e.preventDefault()
+  if (!newPassword.trim()) return
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) {
+    alert("Erreur : " + error.message)
+  } else {
+    alert("Mot de passe mis à jour avec succès !")
+    setNewPassword('')
+  }
+}
   // Sauvegarde globale du profil
   const handleSaveProfile = async () => {
     if (!name.trim()) return alert("Le nom est obligatoire")
