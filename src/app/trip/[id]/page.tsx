@@ -55,7 +55,28 @@ export default function TripPage() {
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
   const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
   
-  const [newWeek, setNewWeek] = useState('')
+const [newWeek, setNewWeek] = useState('')
+  const [editingWeekId, setEditingWeekId] = useState<string | null>(null)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  // Générateur automatique de la phrase "Du X au Y Mois"
+  useEffect(() => {
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const startDay = start.getDate()
+      const endDay = end.getDate()
+      const startMonth = start.toLocaleDateString('fr-FR', { month: 'long' })
+      const endMonth = end.toLocaleDateString('fr-FR', { month: 'long' })
+
+      if (startMonth === endMonth) {
+        setNewWeek(`Du ${startDay} au ${endDay} ${startMonth}`)
+      } else {
+        setNewWeek(`Du ${startDay} ${startMonth} au ${endDay} ${endMonth}`)
+      }
+    }
+  }, [startDate, endDate])
   const [newRegion, setNewRegion] = useState('')
   const [editingRegionId, setEditingRegionId] = useState<string | null>(null)
   
@@ -244,13 +265,21 @@ const handleRemoveMember = async (memberId: string) => {
     alert(err.message);
   }
 };
-  const handleSaveWeek = async (e?: React.FormEvent) => {
+const handleSaveWeek = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
     if(!newWeek.trim()) return;
-    await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]);
-    setNewWeek(''); fetchTripData();
+    if (editingWeekId) {
+      await supabase.from('proposed_weeks').update({ week_text: newWeek }).eq('id', editingWeekId);
+      setEditingWeekId(null);
+    } else {
+      await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]);
+    }
+    setNewWeek(''); setStartDate(''); setEndDate(''); fetchTripData();
   }
-  const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
+
+  const startEditWeek = (w: any) => { setEditingWeekId(w.id); setNewWeek(w.text); setStartDate(''); setEndDate(''); }
+  const handleDeleteWeek = async (id: string) => { if(confirm("Supprimer cette date ?")) { await supabase.from('proposed_weeks').delete().eq('id', id); fetchTripData(); } }
+const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
     if(!currentUser) return;
     const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
     setProposedWeeks(prev => prev.map(w => w.id === weekId ? {...w, votes: newVotes} : w));
@@ -643,25 +672,42 @@ const handleRemoveMember = async (memberId: string) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
-                      <div className="space-y-3 mb-4">
-                        {proposedWeeks.sort((a, b) => b.votes.length - a.votes.length).map(w => (
-                          <div key={w.id} className="flex items-center justify-between bg-white p-3 rounded-xl border shadow-sm">
-                            <span className="font-semibold text-sm">{w.text}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
-                              <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <form onSubmit={handleSaveWeek} className="flex gap-2">
-                        <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Ex: Du 12 au 19 Août" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
-                        <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50"><Plus size={18}/></button>
-                      </form>
-                    </div>
-
+<div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+  <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
+  <div className="space-y-3 mb-4">
+    {proposedWeeks.sort((a, b) => b.votes.length - a.votes.length).map(w => (
+      <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
+          {(isAdmin || w.by === currentUser?.id) && (
+            <>
+              <button onClick={() => startEditWeek(w)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button>
+              <button onClick={() => handleDeleteWeek(w.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center justify-between pr-14">
+          <span className="font-semibold text-sm">{w.text}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
+            <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+  <form onSubmit={handleSaveWeek} className="flex flex-col gap-2">
+    <div className="flex gap-2">
+      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de début" />
+      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de fin" />
+    </div>
+    <div className="flex gap-2">
+      <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Format libre (Ex: Mi-Août)" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
+      <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">
+        {editingWeekId ? <Check size={18}/> : <Plus size={18}/>}
+      </button>
+    </div>
+  </form>
+</div>
                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-indigo-600"/> La Zone Géo</h3>
                       <div className="space-y-3 mb-4">
