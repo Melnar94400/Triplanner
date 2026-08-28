@@ -22,7 +22,7 @@ type Activity = {
   id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>;
 }
 const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
-const WEEK_DAYS = ['Samedi', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+const WEEK_DAYS = ['Samedi (Arrivée)', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Départ)'];
 
 type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
 type PendingMedia = { id: string; file: File; preview: string; day: string; time_slot: string; };
@@ -486,7 +486,7 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
             const [dateStr, timeStr] = dateTime.split(' ');
             const [y, m, d] = dateStr.split(':');
             const dateObj = new Date(Number(y), Number(m)-1, Number(d));
-            autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][dateObj.getDay()];
+            autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Arrivée)', 'Samedi (Départ)      '][dateObj.getDay()];
             
             const hour = parseInt(timeStr.split(':')[0]);
             if (hour >= 6 && hour < 12) autoSlot = 'Matin';
@@ -494,6 +494,10 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
             else if (hour >= 14 && hour < 19) autoSlot = 'Après-midi';
             else if (hour >= 19 && hour < 22) autoSlot = 'Dîner';
             else autoSlot = 'Soirée';
+            // Sépare le bon samedi selon l'heure (avant 14h = Départ, après 14h = Arrivée)
+            if (autoDay === 'Samedi') {
+              autoDay = hour < 14 ? 'Samedi (Départ)' : 'Samedi (Arrivée)';
+      }
           }
 
           resolve({ id: Math.random().toString(36).substring(2), file, preview: URL.createObjectURL(file), day: autoDay, time_slot: autoSlot, lat, lng } as PendingMedia & { lat: number | null, lng: number | null });
@@ -824,8 +828,36 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
                           <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
                             <div className="w-32 flex-shrink-0 flex flex-col gap-2">
                               <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
-                              <button onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} className={`text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors w-fit shadow-sm border ${slotMedia.length > 0 ? 'bg-indigo-50 border-indigo-100 text-indigo-600 font-bold' : 'bg-white border-gray-200 text-gray-400 font-medium'}`}><Camera size={12} /> {slotMedia.length > 0 ? `${slotMedia.length} photo(s)` : 'Photos'}</button>
-                            </div>
+{(() => {
+  // On filtre les photos qui correspondent exactement à ce jour et ce moment
+  const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
+  
+  return (
+    <div className="flex flex-col gap-3 mt-2">
+      <button 
+        onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
+        className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
+      >
+        <Camera size={14} /> Ajouter des photos
+      </button>
+      
+      {/* Affichage des miniatures (si des photos existent pour ce créneau) */}
+      {slotPhotos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {slotPhotos.map((photo: any) => (
+            <div key={photo.id} className="w-14 h-14 relative group">
+              <img 
+                src={photo.file_path} 
+                alt="Souvenir" 
+                className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm" 
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+})()}                            </div>
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {slotMeals.map(meal => (
                                 <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
