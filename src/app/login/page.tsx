@@ -1,12 +1,14 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { Compass, Loader2, Mail, Lock, User } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/'
   const [isLogin, setIsLogin] = useState(true)
   const [pseudo, setPseudo] = useState('')
   const [email, setEmail] = useState('')
@@ -26,8 +28,8 @@ export default function LoginPage() {
           password,
         })
         if (signInError) throw signInError
-        router.push('/')
-      } else {
+    router.push(returnTo)      
+  } else {
         if (!pseudo.trim()) throw new Error("Le pseudo est obligatoire.")
 
         // Vérifier si le pseudo existe déjà dans la base
@@ -49,7 +51,7 @@ export default function LoginPage() {
           }
         })
         if (signUpError) throw signUpError
-        router.push('/profile')
+        router.push(returnTo)
       }
     } catch (err: any) {
       setError(err.message === "Invalid login credentials" ? "Email ou mot de passe incorrect." : err.message)

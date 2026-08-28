@@ -86,10 +86,9 @@ export default function JoinTripPage() {
             <p className="text-sm text-[#e2ede6]">Connectez-vous ou créez un compte pour rejoindre ce séjour entre amis.</p>
           </div>
           <button 
-            onClick={() => router.push('/login')} 
-            className="w-full bg-[#9a3412] text-white py-3.5 rounded-xl font-bold shadow-md hover:bg-[#7c2d12] transition-all flex items-center justify-center gap-2"
-          >
-            Se connecter pour rejoindre <ArrowRight size={18} />
+             onClick={() => router.push(`/login?returnTo=/join/${code}`)} 
+              className="w-full bg-[#9a3412] text-white py-3.5 rounded-xl font-bold shadow-md hover:bg-[#7c2d12] transition-all flex items-center justify-center gap-2">
+               Se connecter pour rejoindre <ArrowRight size={18} />
           </button>
         </div>
       </div>
