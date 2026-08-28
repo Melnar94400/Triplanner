@@ -7,8 +7,8 @@ import dynamic from 'next/dynamic'
 import {
   Calendar, MapPin, Users, Utensils, ShoppingBag, PieChart,
   Plus, Check, X, Pencil, Trash2, ArrowRight, Compass, Loader2, ChevronLeft,
-  Star, ExternalLink, Edit3, CalendarDays, Camera, RotateCw, ChevronRight, Play, Copy,
-  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target, Moon, Sun
+  Star, ExternalLink, CalendarDays, Camera, ChevronRight, Play, Copy,
+  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target
 } from 'lucide-react'
 import EXIF from 'exif-js'
 
@@ -21,11 +21,20 @@ type ActivityVote = 'yes' | 'maybe' | 'no';
 type Activity = {
   id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>;
 }
-const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
-const WEEK_DAYS = ['Samedi (Arrivée)', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Départ)'];
-
 type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
 type PendingMedia = { id: string; file: File; preview: string; day: string; time_slot: string; };
+
+const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi (Arrivée)': 'bg-orange-100 text-orange-700', 'Samedi (Départ)': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
+const WEEK_DAYS = ['Samedi (Arrivée)', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Départ)'];
+
+const DAY_ORDER: Record<string, number> = {
+  'Samedi (Arrivée)': 1, 'Dimanche': 2, 'Lundi': 3, 'Mardi': 4, 
+  'Mercredi': 5, 'Jeudi': 6, 'Vendredi': 7, 'Samedi (Départ)': 8
+};
+
+const SLOT_ORDER: Record<string, number> = {
+  'Matin': 1, 'Déjeuner': 2, 'Après-midi': 3, 'Dîner': 4, 'Soirée': 5
+};
 
 export default function TripPage() {
   const params = useParams()
@@ -34,14 +43,14 @@ export default function TripPage() {
 
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [members, setMembers] = useState<Member[]>([])
-  const [activeTab, setActiveTab] = useState('destination') // L'onglet par défaut fusionné
+  const [activeTab, setActiveTab] = useState('destination')
   const [trip, setTrip] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [settlements, setSettlements] = useState<any[]>([]);
-  const [weather, setWeather] = useState<any[] | null>(null);
+  const [settlements, setSettlements] = useState<any[]>([])
+  const [weather, setWeather] = useState<any[] | null>(null)
   
-// Destination States (Proposals)
+  // Destination States
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
   const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
@@ -53,34 +62,35 @@ export default function TripPage() {
   const [showPlaceForm, setShowPlaceForm] = useState(false)
   const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({ name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null as number|null, lng: null as number|null })  
-  // Lock States (Admin)
+  
+  // Lock States
   const [lockWeek, setLockWeek] = useState('')
   const [lockRegion, setLockRegion] = useState('')
   const [lockPlaceId, setLockPlaceId] = useState('')
   const [isLocking, setIsLocking] = useState(false)
 
   // Meals States
-  const [meals, setMeals] = useState<Meal[]>([]);
-  const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({});
-  const [showMealForm, setShowMealForm] = useState(false);
-  const [editingMealId, setEditingMealId] = useState<string | number | null>(null);
-  const [mealDay, setMealDay] = useState('Samedi');
-  const [mealType, setMealType] = useState('Dîner');
-  const [mealName, setMealName] = useState('');
-  const [mealStarter, setMealStarter] = useState('');
-  const [mealDessert, setMealDessert] = useState('');
-  const [mealDrinks, setMealDrinks] = useState('');
-  const [mealRecipeLink, setMealRecipeLink] = useState('');
-  const [mealCooks, setMealCooks] = useState<string[]>([]);
-  const [mealIngredients, setMealIngredients] = useState<{name: string, qty: string}[]>([]);
+  const [meals, setMeals] = useState<Meal[]>([])
+  const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({})
+  const [showMealForm, setShowMealForm] = useState(false)
+  const [editingMealId, setEditingMealId] = useState<string | number | null>(null)
+  const [mealDay, setMealDay] = useState('Samedi (Arrivée)')
+  const [mealType, setMealType] = useState('Dîner')
+  const [mealName, setMealName] = useState('')
+  const [mealStarter, setMealStarter] = useState('')
+  const [mealDessert, setMealDessert] = useState('')
+  const [mealDrinks, setMealDrinks] = useState('')
+  const [mealRecipeLink, setMealRecipeLink] = useState('')
+  const [mealCooks, setMealCooks] = useState<string[]>([])
+  const [mealIngredients, setMealIngredients] = useState<{name: string, qty: string}[]>([])
   
-  // Extra Shopping Items States
-  const [extraItems, setExtraItems] = useState<{id: string, name: string, qty: string}[]>([]);
-  const [newExtraItem, setNewExtraItem] = useState('');
-  const [newExtraQty, setNewExtraQty] = useState('');
+  // Extra Shopping
+  const [extraItems, setExtraItems] = useState<{id: string, name: string, qty: string}[]>([])
+  const [newExtraItem, setNewExtraItem] = useState('')
+  const [newExtraQty, setNewExtraQty] = useState('')
 
   // Activities States
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([])
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [editingActivityId, setEditingActivityId] = useState<string | number | null>(null)
   const [actTitle, setActTitle] = useState('')
@@ -93,35 +103,34 @@ export default function TripPage() {
   const [isSavingAct, setIsSavingAct] = useState(false)
 
   // Expenses States
-  const [expenses, setExpenses] = useState<{ id: string | number; title: string; amount: number; paidBy: string; splitAmong: string[] }[]>([]);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [editingExpenseId, setEditingExpenseId] = useState<string | number | null>(null);
-  const [expenseTitle, setExpenseTitle] = useState('');
-  const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
-  const [expensePayer, setExpensePayer] = useState<string>('');
-  const [expenseSplitAmong, setExpenseSplitAmong] = useState<string[]>([]);
+  const [expenses, setExpenses] = useState<{ id: string | number; title: string; amount: number; paidBy: string; splitAmong: string[] }[]>([])
+  const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [editingExpenseId, setEditingExpenseId] = useState<string | number | null>(null)
+  const [expenseTitle, setExpenseTitle] = useState('')
+  const [expenseAmount, setExpenseAmount] = useState<number | ''>('')
+  const [expensePayer, setExpensePayer] = useState<string>('')
+  const [expenseSplitAmong, setExpenseSplitAmong] = useState<string[]>([])
 
   // Media States
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedSlotForMedia, setSelectedSlotForMedia] = useState<{day: string, slot: string} | null>(null);
-  const [gallerySortMode, setGallerySortMode] = useState<'date' | 'moment'>('date');
-  const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
-  const [pendingMediaItems, setPendingMediaItems] = useState<PendingMedia[]>([]);
-  const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null);
-  const [editMediaDay, setEditMediaDay] = useState('');
-  const [editMediaSlot, setEditMediaSlot] = useState('');
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [selectedSlotForMedia, setSelectedSlotForMedia] = useState<{day: string, slot: string} | null>(null)
+  const [gallerySortMode, setGallerySortMode] = useState<'date' | 'moment'>('date')
+  const [showMediaUploadModal, setShowMediaUploadModal] = useState(false)
+  const [pendingMediaItems, setPendingMediaItems] = useState<PendingMedia[]>([])
+  const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null)
+  const [editMediaDay, setEditMediaDay] = useState('')
+  const [editMediaSlot, setEditMediaSlot] = useState('')
 
   // Lightbox
-  const [viewerItems, setViewerItems] = useState<MediaItem[]>([]);
-  const [viewerCurrentIndex, setViewerCurrentIndex] = useState<number | null>(null);
-  const [viewerRotation, setViewerRotation] = useState(0);
+  const [viewerItems, setViewerItems] = useState<MediaItem[]>([])
+  const [viewerCurrentIndex, setViewerCurrentIndex] = useState<number | null>(null)
+  const [viewerRotation, setViewerRotation] = useState(0)
 
-  const openViewer = (items: MediaItem[], index: number) => { setViewerItems(items); setViewerCurrentIndex(index); setViewerRotation(0); };
-  const closeViewer = () => setViewerCurrentIndex(null);
-  const nextMedia = () => { setViewerCurrentIndex(prev => (prev! + 1) % viewerItems.length); setViewerRotation(0); };
-  const prevMedia = () => { setViewerCurrentIndex(prev => (prev! - 1 + viewerItems.length) % viewerItems.length); setViewerRotation(0); };
-  const rotateMedia = () => setViewerRotation(prev => prev + 90);
+  const openViewer = (items: MediaItem[], index: number) => { setViewerItems(items); setViewerCurrentIndex(index); setViewerRotation(0); }
+  const closeViewer = () => setViewerCurrentIndex(null)
+  const nextMedia = () => { setViewerCurrentIndex(prev => (prev! + 1) % viewerItems.length); setViewerRotation(0); }
+  const prevMedia = () => { setViewerCurrentIndex(prev => (prev! - 1 + viewerItems.length) % viewerItems.length); setViewerRotation(0); }
 
   useEffect(() => {
     fetchTripData()
@@ -149,12 +158,12 @@ export default function TripPage() {
         .then(res => res.json())
         .then(data => {
           if (data.daily) {
-            const forecast = data.daily.time.map((date: string, i: number) => ({ date, max: data.daily.temperature_2m_max[i], min: data.daily.temperature_2m_min[i], code: data.daily.weathercode[i] }));
-            setWeather(forecast);
+            const forecast = data.daily.time.map((date: string, i: number) => ({ date, max: data.daily.temperature_2m_max[i], min: data.daily.temperature_2m_min[i], code: data.daily.weathercode[i] }))
+            setWeather(forecast)
           }
-        }).catch(e => console.error(e));
+        }).catch(e => console.error(e))
     }
-  }, [trip?.accommodation_lat, trip?.accommodation_lng]);
+  }, [trip?.accommodation_lat, trip?.accommodation_lng])
 
   const getWeatherIcon = (code: number) => {
     if (code === 0) return '☀️'; if (code >= 1 && code <= 3) return '⛅'; if (code >= 45 && code <= 48) return '🌫️'; 
@@ -178,10 +187,11 @@ export default function TripPage() {
       const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId)
       if (rData) setProposedRegions(rData.map((r:any) => ({id: r.id, name: r.name, ratings: r.ratings || {}, by: r.proposed_by})))
 
-const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId)
+      const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId)
       if (pData) setProposedPlaces(pData.map((p:any) => ({id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, beds: p.beds, amenities: p.amenities, link: p.link, ratings: p.ratings || {}, by: p.proposed_by})))
-      const { data: settlementsData } = await supabase.from('settlements').select('*').eq('trip_id', tripId);
-      setSettlements(settlementsData || []);
+      
+      const { data: settlementsData } = await supabase.from('settlements').select('*').eq('trip_id', tripId)
+      setSettlements(settlementsData || [])
 
       const { data: membersData } = await supabase.from('trip_members').select('user_id, role, profiles(id, name, avatar)').eq('trip_id', tripId)
       let loadedMembers: Member[] = []
@@ -210,23 +220,23 @@ const { data: pData } = await supabase.from('proposed_places').select('*').eq('t
         }))
       }
 
-      const { data: extraData } = await supabase.from('shopping_items').select('*').eq('trip_id', tripId);
-      if (extraData) setExtraItems(extraData.map((item: any) => ({ id: item.id, name: item.name, qty: item.qty || '' })));
+      const { data: extraData } = await supabase.from('shopping_items').select('*').eq('trip_id', tripId)
+      if (extraData) setExtraItems(extraData.map((item: any) => ({ id: item.id, name: item.name, qty: item.qty || '' })))
       
-      const { data: mediaData } = await supabase.from('media').select('*').eq('trip_id', tripId).order('created_at', { ascending: false });
-      if (mediaData) setMediaItems(mediaData);  
+      const { data: mediaData } = await supabase.from('media').select('*').eq('trip_id', tripId).order('created_at', { ascending: false })
+      if (mediaData) setMediaItems(mediaData)  
 
-      const { data: expensesData } = await supabase.from('expenses').select('*').eq('trip_id', tripId);
-      if (expensesData) setExpenses(expensesData.map((e: any) => ({ id: e.id, title: e.title, amount: e.amount, paidBy: e.paid_by, splitAmong: e.split_among || [] })));
+      const { data: expensesData } = await supabase.from('expenses').select('*').eq('trip_id', tripId)
+      if (expensesData) setExpenses(expensesData.map((e: any) => ({ id: e.id, title: e.title, amount: e.amount, paidBy: e.paid_by, splitAmong: e.split_among || [] })))
       
     } catch (err: any) { setError(err.message) } finally { setLoading(false) }
   }
 
   // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
-  const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin';
-  const isLocked = trip?.is_planning_locked;
+  const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin'
+  const isLocked = trip?.is_planning_locked
 
-const handleSaveWeek = async (e?: React.FormEvent) => {
+  const handleSaveWeek = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
     if(!newWeek.trim()) return;
     await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]);
@@ -283,9 +293,10 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
     }
     setShowPlaceForm(false); setEditingPlaceId(null); setPlaceData({name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null, lng: null}); fetchTripData();
   }
+  
   const startEditPlace = (p: any) => { setEditingPlaceId(p.id); setPlaceData({ name: p.name, address: p.address, price: p.price || '', beds: p.beds || '', amenities: p.amenities || '', link: p.link || '', lat: p.lat, lng: p.lng }); setShowPlaceForm(true); }
   const handleDeletePlace = async (id: string) => { if(confirm("Supprimer ce gîte ?")) { await supabase.from('proposed_places').delete().eq('id', id); fetchTripData(); } }
-
+  
   const togglePlaceVote = async (placeId: string, currentVotes: string[]) => {
     if(!currentUser) return;
     const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
@@ -293,20 +304,17 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
     await supabase.from('proposed_places').update({votes: newVotes}).eq('id', placeId);
   }
 
-// --- GESTION DU CONSENSUS ---
+  // --- GESTION DU CONSENSUS ---
   const getRatingStats = (ratings: Record<string, number>) => { 
     const scores = Object.values(ratings); 
     if (scores.length === 0) return { avg: 0, sd: 0, consensus: 0 }; 
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length; 
-    // Calcul de l'écart type (dispersion)
     const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length;
     const sd = Math.sqrt(variance);
-    // Algorithme : On pénalise la moyenne si l'écart type est grand (Option clivante = Note qui chute)
     let consensus = avg - (sd * 0.8);
     return { avg, sd, consensus: Math.max(0, consensus) }; 
   }
 
-  // --- VOTES (ÉTOILES) ---
   const handlePlaceRating = async (placeId: string, currentRatings: any, score: number) => {
     if(!currentUser) return;
     const newRatings = {...currentRatings, [currentUser.id]: score};
@@ -314,7 +322,6 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
     await supabase.from('proposed_places').update({ratings: newRatings}).eq('id', placeId);
   }
 
-  // --- VERROUILLAGE EN 2 PHASES (ADMIN) ---
   const handleLockPhase1 = async () => {
     if (!lockWeek || !lockRegion) return alert("Sélectionnez la semaine et la région !");
     setIsLocking(true);
@@ -342,6 +349,7 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
       await fetchTripData(); setActiveTab('activities');
     } catch(err:any) { alert(err.message); } finally { setIsLocking(false); }
   }
+  
   const handleUnlockTrip = async () => {
     if (!confirm("Déverrouiller le voyage ?")) return;
     await supabase.from('trips').update({ is_planning_locked: false }).eq('id', tripId);
@@ -353,9 +361,10 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
     else setActiveTab(tabName);
   };
 
-  // --- REPAS & COURSES --- (Logique inchangée)
-  const resetMealForm = () => { setEditingMealId(null); setMealDay('Samedi'); setMealType('Déjeuner'); setMealName(''); setMealStarter(''); setMealDessert(''); setMealDrinks(''); setMealRecipeLink(''); setMealCooks([]); setMealIngredients([{ name: '', qty: '' }]); setShowMealForm(false); };
+  // --- REPAS & COURSES ---
+  const resetMealForm = () => { setEditingMealId(null); setMealDay('Samedi (Arrivée)'); setMealType('Déjeuner'); setMealName(''); setMealStarter(''); setMealDessert(''); setMealDrinks(''); setMealRecipeLink(''); setMealCooks([]); setMealIngredients([{ name: '', qty: '' }]); setShowMealForm(false); };
   const editMeal = (meal: Meal) => { setEditingMealId(meal.id); setMealDay(meal.day); setMealType(meal.type); setMealName(meal.name || ''); setMealStarter(meal.starter || ''); setMealDessert(meal.dessert || ''); setMealDrinks(meal.drinks || ''); setMealRecipeLink(meal.recipeLink || ''); setMealCooks(meal.cooks || []); setMealIngredients(meal.ingredients?.length ? meal.ingredients : [{ name: '', qty: '' }]); setShowMealForm(true); };
+  
   const handleSaveMeal = async () => { 
     if (!mealName.trim()) return; 
     const mealPayload = { trip_id: tripId, day: mealDay, type: mealType, name: mealName.trim(), starter: mealStarter.trim() || null, dessert: mealDessert.trim() || null, drinks: mealDrinks.trim() || null, recipe_link: mealRecipeLink.trim() || null }; 
@@ -375,6 +384,7 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
 
   const handleAddExtraItem = async (e: React.FormEvent) => { e.preventDefault(); if (!newExtraItem.trim()) return; await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); };
   const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
+  
   const shoppingList = React.useMemo(() => {
     const list: Record<string, any> = {}
     meals.forEach(meal => {
@@ -394,10 +404,11 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
   }, [meals, extraItems])
   const toggleCheck = (id: string) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }))
 
-  // --- ACTIVITÉS --- (Logique inchangée)
+  // --- ACTIVITÉS ---
   const resetActivityForm = () => { setEditingActivityId(null); setActTitle(''); setActDesc(''); setActPrice(''); setActLink(''); setActAddress(''); setActDay(''); setActTimeSlot(''); setShowActivityForm(false); }
   const editActivity = (act: Activity) => { setEditingActivityId(act.id); setActTitle(act.title); setActDesc(act.description); setActPrice(act.price); setActLink(act.link || ''); setActAddress(act.address || ''); setActDay(act.day || ''); setActTimeSlot(act.timeSlot || ''); setShowActivityForm(true); }
-const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefault();
+  
+  const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefault();
     if (!actTitle.trim() || !currentUser) return; setIsSavingAct(true);
     let lat = null, lng = null, durationStr = null;
     if (actAddress.trim()) {
@@ -424,9 +435,10 @@ const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefa
     if (!currentUser) return; await supabase.from('activity_votes').upsert({ activity_id: actId, user_id: currentUser.id, vote: voteType }, { onConflict: 'activity_id, user_id' }); fetchTripData();
   }
 
-  // --- DÉPENSES --- (Logique inchangée)
+  // --- DÉPENSES ---
   const resetExpenseForm = () => { setEditingExpenseId(null); setExpenseTitle(''); setExpenseAmount(''); setExpensePayer(currentUser?.id || ''); setExpenseSplitAmong(members.map(m => m.id)); setShowExpenseForm(false); };
   const editExpense = (exp: any) => { setEditingExpenseId(exp.id); setExpenseTitle(exp.title); setExpenseAmount(exp.amount); setExpensePayer(exp.paidBy); setExpenseSplitAmong(exp.splitAmong); setShowExpenseForm(true); };
+  
   const handleSaveExpense = async () => {
     if (!expenseTitle.trim() || !expenseAmount || Number(expenseAmount) <= 0 || expenseSplitAmong.length === 0 || !expensePayer) return alert("Remplir tous les champs !");
     const payload = { trip_id: tripId, title: expenseTitle, amount: Number(expenseAmount), paid_by: expensePayer, split_among: expenseSplitAmong };
@@ -448,8 +460,8 @@ const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefa
   }, [members, expenses, settlements]);
   const getMember = (id: string) => allKnownMembers.find(m => m.id === id) || { name: 'Ancien membre 👻', avatar: '👤' };
 
-// --- MEDIAS ---
-const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>) => { 
+  // --- MEDIAS ---
+  const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>) => { 
     if (!e.target.files) return; 
     const files = Array.from(e.target.files); 
     
@@ -464,7 +476,6 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
           const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
           
           if (latData && lngData && latRef && lngRef && latData.length >= 3 && lngData.length >= 3) {
-            // CORRECTION : On divise chaque numérateur par son dénominateur pour avoir la vraie précision
             const latDeg = latData[0].numerator / (latData[0].denominator || 1);
             const latMin = latData[1].numerator / (latData[1].denominator || 1);
             const latSec = latData[2].numerator / (latData[2].denominator || 1);
@@ -480,13 +491,12 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
             if (lngRef === 'W') lng = -lng;
           }
 
-          // Extraction Date et Heure pour le placement auto
           const dateTime = EXIF.getTag(this, 'DateTimeOriginal');
           if (dateTime && !selectedSlotForMedia) {
             const [dateStr, timeStr] = dateTime.split(' ');
             const [y, m, d] = dateStr.split(':');
             const dateObj = new Date(Number(y), Number(m)-1, Number(d));
-            autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Arrivée)', 'Samedi (Départ)      '][dateObj.getDay()];
+            autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][dateObj.getDay()];
             
             const hour = parseInt(timeStr.split(':')[0]);
             if (hour >= 6 && hour < 12) autoSlot = 'Matin';
@@ -494,10 +504,10 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
             else if (hour >= 14 && hour < 19) autoSlot = 'Après-midi';
             else if (hour >= 19 && hour < 22) autoSlot = 'Dîner';
             else autoSlot = 'Soirée';
-            // Sépare le bon samedi selon l'heure (avant 14h = Départ, après 14h = Arrivée)
+            
             if (autoDay === 'Samedi') {
               autoDay = hour < 14 ? 'Samedi (Départ)' : 'Samedi (Arrivée)';
-      }
+            }
           }
 
           resolve({ id: Math.random().toString(36).substring(2), file, preview: URL.createObjectURL(file), day: autoDay, time_slot: autoSlot, lat, lng } as PendingMedia & { lat: number | null, lng: number | null });
@@ -508,12 +518,11 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
     setPendingMediaItems(prev => [...prev, ...newPending]); 
     e.target.value = ''; 
   };
-  // RESTAURATION des fonctions manquantes
+  
   const updatePendingMedia = (id: string, field: 'day' | 'time_slot', value: string) => { setPendingMediaItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item)); };
   const removePendingMedia = (id: string) => { setPendingMediaItems(prev => { const itemToRevoke = prev.find(item => item.id === id); if (itemToRevoke) URL.revokeObjectURL(itemToRevoke.preview); return prev.filter(item => item.id !== id); }); };
   const closeMediaUploadModal = () => { pendingMediaItems.forEach(item => URL.revokeObjectURL(item.preview)); setPendingMediaItems([]); setShowMediaUploadModal(false); setSelectedSlotForMedia(null); };
 
-  // CORRECTION du payload d'envoi
   const handleBulkMediaUpload = async () => { 
     if (pendingMediaItems.length === 0) return; 
     setIsUploading(true); 
@@ -525,7 +534,8 @@ const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>
         const filePath = `${tripId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`; 
         await supabase.storage.from('trip-media').upload(filePath, item.file); 
         const { data } = supabase.storage.from('trip-media').getPublicUrl(filePath); 
-return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUrl, media_type: item.file.type.startsWith('video/') ? 'video' : 'image', day: item.day || null, time_slot: item.time_slot || null, lat: (item as any).lat || null, lng: (item as any).lng || null };      }); 
+        return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUrl, media_type: item.file.type.startsWith('video/') ? 'video' : 'image', day: item.day || null, time_slot: item.time_slot || null, lat: (item as any).lat || null, lng: (item as any).lng || null };      
+      }); 
       const dbPayloads = await Promise.all(uploadPromises); 
       await supabase.from('media').insert(dbPayloads); 
       fetchTripData(); 
@@ -540,6 +550,21 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
   const handleDeleteMedia = async (id: string, url: string) => { if(!confirm("Es-tu sûr de vouloir supprimer cette photo définitivement ?")) return; try { const urlParts = url.split('/'); await supabase.storage.from('trip-media').remove([`${tripId}/${urlParts[urlParts.length - 1]}`]); await supabase.from('media').delete().eq('id', id); fetchTripData(); } catch (error: any) {} }; 
   const openEditMedia = (media: MediaItem) => { setEditingMedia(media); setEditMediaDay(media.day || ''); setEditMediaSlot(media.time_slot || ''); };
   const handleSaveMediaEdit = async () => { if (!editingMedia) return; await supabase.from('media').update({ day: editMediaDay || null, time_slot: editMediaSlot || null }).eq('id', editingMedia.id); fetchTripData(); setEditingMedia(null); };
+  
+  // CALCUL DES MÉDIAS À AFFICHER (Tri chronologique)
+  const displayedMedia = gallerySortMode === 'moment' 
+    ? [...mediaItems].sort((a, b) => {
+        const dayA = DAY_ORDER[a.day || ''] || 99;
+        const dayB = DAY_ORDER[b.day || ''] || 99;
+        if (dayA !== dayB) return dayA - dayB;
+        
+        const slotA = SLOT_ORDER[a.time_slot || ''] || 99;
+        const slotB = SLOT_ORDER[b.time_slot || ''] || 99;
+        return slotA - slotB;
+      })
+    : mediaItems;
+
+
   if (loading && !trip) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
   if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
 
@@ -549,19 +574,19 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
         <div className="p-6">
           <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-indigo-600 mb-4 transition-colors"><ChevronLeft size={14} /> Mes voyages</button>
           <h1 className="text-xl font-black text-indigo-600 tracking-tight truncate">{trip.name}</h1>
-<button 
-  onClick={() => { 
-    const inviteLink = `${window.location.origin}/join/${trip.invite_code}`;
-    navigator.clipboard.writeText(inviteLink); 
-    alert("Lien d'invitation copié ! Envoie-le à tes potes 🚀"); 
-  }} 
-  className="mt-4 flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit group"
->
-  <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien d'invitation
-</button>        </div>
+          <button 
+            onClick={() => { 
+              const inviteLink = `${window.location.origin}/join/${trip.invite_code}`;
+              navigator.clipboard.writeText(inviteLink); 
+              alert("Lien d'invitation copié ! Envoie-le à tes potes 🚀"); 
+            }} 
+            className="mt-4 flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit group"
+          >
+            <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien
+          </button>        
+        </div>
         
         <nav className="flex-1 px-4 space-y-2 mt-2">
-          {/* L'onglet fusionné Destination */}
           <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}>
             <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
             {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
@@ -587,8 +612,7 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
 
         <div className="p-4 md:p-8">
           
-          {/* NOUVEL ONGLET FUSIONNÉ : DESTINATION */}
-{/* ONGLET DESTINATION (PHASÉ) */}
+          {/* ONGLET DESTINATION (PHASÉ) */}
           {activeTab === 'destination' && (
             <div className="max-w-6xl mx-auto space-y-8">
               
@@ -767,13 +791,15 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
 
                     <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-gray-50">
                       <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte Logistique</div>
-<MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />                    </div>
+                      <MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           )}
-{/* FORMULAIRE GÎTE */}
+
+          {/* FORMULAIRE GÎTE */}
           {showPlaceForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <form onSubmit={handleSavePlace} className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4">
@@ -790,7 +816,8 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
               </form>
             </div>
           )}
-          {/* PLANNING (Avec Météo) */}
+          
+          {/* PLANNING */}
           {activeTab === 'calendar' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <h2 className="text-2xl font-bold text-gray-800">Planning de la semaine</h2>
@@ -822,42 +849,54 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
                       {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(slot => {
                         const slotMeals = meals.filter(m => m.day === day && m.type === slot);
                         const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
-                        const slotMedia = mediaItems.filter(m => m.day === day && m.time_slot === slot);
-
+                        
                         return (
                           <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
                             <div className="w-32 flex-shrink-0 flex flex-col gap-2">
                               <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
-{(() => {
-  // On filtre les photos qui correspondent exactement à ce jour et ce moment
-  const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
-  
-  return (
-    <div className="flex flex-col gap-3 mt-2">
-      <button 
-        onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
-        className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
-      >
-        <Camera size={14} /> Ajouter des photos
-      </button>
-      
-      {/* Affichage des miniatures (si des photos existent pour ce créneau) */}
-      {slotPhotos.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {slotPhotos.map((photo: any) => (
-            <div key={photo.id} className="w-14 h-14 relative group">
-              <img 
-                src={photo.file_path} 
-                alt="Souvenir" 
-                className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm" 
-              />
-            </div>
-          ))}
+                              {(() => {
+                                const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
+                                return (
+                                  <div className="flex flex-col gap-3 mt-2">
+                                    <button 
+                                      onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
+                                      className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
+                                    >
+                                      <Camera size={14} /> Ajouter des photos
+                                    </button>
+                                    
+                                    {slotPhotos.length > 0 && (
+                                      <div className="flex flex-wrap gap-2">
+{slotPhotos.map((photo: any, idx: number) => (
+  <div key={photo.id} className="w-14 h-14 relative group">
+    {photo.media_type === 'video' ? (
+      <>
+        <video 
+          src={photo.file_path} 
+          className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" 
+          onClick={() => openViewer(slotPhotos, idx)} 
+        />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white">
+            <Play size={10} fill="currentColor" />
+          </div>
         </div>
-      )}
-    </div>
-  );
-})()}                            </div>
+      </>
+    ) : (
+      <img 
+        src={photo.file_path} 
+        alt="Souvenir" 
+        onClick={() => openViewer(slotPhotos, idx)}
+        className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" 
+      />
+    )}
+  </div>
+))}                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {slotMeals.map(meal => (
                                 <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
@@ -884,13 +923,15 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
             </div>
           )}
 
+          {/* ACTIVITÉS */}
           {activeTab === 'activities' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-gray-800">Boîte à idées</h2><button onClick={() => { resetActivityForm(); setShowActivityForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Proposer</button></div>
               {trip?.accommodation_lat && trip?.accommodation_lng && (
                 <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-white shadow-sm mb-6">
                   <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte des activités</div>
-<MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />                </div>
+                  <MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />
+                </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {activities.map(act => (
@@ -943,6 +984,7 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
             </div>
           )}
 
+          {/* REPAS & COURSES */}
           {activeTab === 'meals' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="flex-1 space-y-6">
@@ -1036,6 +1078,7 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
             </div>
           )}
 
+          {/* COMPTES / DÉPENSES */}
           {activeTab === 'expenses' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="w-full lg:w-1/3 space-y-6">
@@ -1115,7 +1158,7 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
             </div>
           )}
           
-          {/* GALERIE (Code inchangé visuellement, tronqué pour la concision de la carte) */}
+          {/* GALERIE AVEC NOUVELLE GRILLE UNIQUE */}
           {activeTab === 'gallery' && (
             <div className="max-w-6xl mx-auto space-y-6 relative">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -1132,41 +1175,42 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
               {mediaItems.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 text-gray-400"><Camera size={48} className="mx-auto mb-4 text-gray-300" /><p>Aucun souvenir pour le moment.</p></div>
               ) : (
-                gallerySortMode === 'date' ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {mediaItems.map((media, idx) => (
-                      <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
-                        {media.media_type === 'video' ? (
-                          <><video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(mediaItems, idx)} /><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white"><Play size={20} fill="currentColor" /></div></div></>
-                        ) : (<img src={media.file_path} alt="Souvenir" onClick={() => openViewer(mediaItems, idx)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />)}
-                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10"><button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-indigo-600"><Pencil size={14} /></button><button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button></div>                        
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].flatMap(slot => WEEK_DAYS.map(day => ({ day, slot, items: mediaItems.filter(m => m.day === day && m.time_slot === slot) }))).filter(g => g.items.length > 0).map((group, idx) => (
-                      <div key={idx} className="space-y-3">
-                        <h3 className="font-bold text-gray-700 flex items-center gap-2 border-b border-gray-100 pb-2"><Calendar size={18} className="text-indigo-500" /> {group.day} • {group.slot} </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                          {group.items.map((media, idx) => (
-                            <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
-                              {media.media_type === 'video' ? ( 
-                                <><video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(group.items, idx)} /><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white"><Play size={20} fill="currentColor" /></div></div></>
-                              ) : (<img src={media.file_path} alt="Souvenir" onClick={() => openViewer(group.items, idx)} className="w-full h-full object-cover cursor-pointer" /> )}
-                              <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 text-white px-2 py-1.5 rounded-lg text-[10px] font-bold">Par {getMember(media.uploader_id)?.name}</div>
-                            </div>
-                          ))}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {displayedMedia.map((media, idx) => (
+                    <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                      
+                      {/* Badge informatif (visible uniquement en tri 'moment') */}
+                      {gallerySortMode === 'moment' && (media.day || media.time_slot) && (
+                        <div className="absolute top-2 left-2 z-10 bg-black/50 text-white text-[10px] px-2 py-1 rounded-md pointer-events-none backdrop-blur-sm">
+                          {media.day?.replace(' (Arrivée)','').replace(' (Départ)','')} {media.time_slot ? `- ${media.time_slot}` : ''}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )
+                      )}
+
+                      {media.media_type === 'video' ? (
+                        <>
+                          <video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(displayedMedia, idx)} />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white">
+                              <Play size={20} fill="currentColor" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={media.file_path} alt="Souvenir" onClick={() => openViewer(displayedMedia, idx)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />
+                      )}
+                      
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10">
+                        <button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-indigo-600"><Pencil size={14} /></button>
+                        <button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button>
+                      </div>                        
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
           
-{/* === MODALE D'ENVOI MULTIPLE AVEC SÉLECTION === */}
+          {/* === MODALE D'ENVOI MULTIPLE AVEC SÉLECTION === */}
           {showMediaUploadModal && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
               <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-5 max-h-[90vh] flex flex-col">
@@ -1177,7 +1221,6 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
                 
                 <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelectionForBulk} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 mb-4 shrink-0"/>
                 
-                {/* Liste des photos en attente avec leurs menus déroulants */}
                 <div className="overflow-y-auto space-y-3 mb-4 flex-1 pr-2">
                   {pendingMediaItems.map(item => (
                     <div key={item.id} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
@@ -1219,6 +1262,8 @@ return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUr
               </div>
             </div>
           )}
+
+          {/* VISIONNEUSE DE MEDIAS EN PLEIN ECRAN */}
           {viewerCurrentIndex !== null && viewerItems.length > 0 && (
             <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center backdrop-blur-md">
               <button onClick={closeViewer} className="absolute top-4 right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><X size={24} /></button>
