@@ -4,8 +4,9 @@ import React, { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { Compass, Loader2, Mail, Lock, User } from 'lucide-react'
+import { Suspense } from 'react'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnTo = searchParams.get('returnTo') || '/'
@@ -156,5 +157,12 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Chargement...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }
