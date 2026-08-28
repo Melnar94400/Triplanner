@@ -675,8 +675,8 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
 <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
   <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
   <div className="space-y-3 mb-4">
-    {proposedWeeks.sort((a, b) => b.votes.length - a.votes.length).map(w => (
-      <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
+{proposedWeeks.map(w => (
+        <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
           {(isAdmin || w.by === currentUser?.id) && (
             <>
@@ -711,8 +711,8 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-indigo-600"/> La Zone Géo</h3>
                       <div className="space-y-3 mb-4">
-                        {proposedRegions.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(r => {
-                          const stats = getRatingStats(r.ratings);
+{proposedRegions.map(r => {
+                            const stats = getRatingStats(r.ratings);
                           return (
                             <div key={r.id} className="bg-white p-3 rounded-xl border shadow-sm flex flex-col gap-2 relative group">
                               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
@@ -780,8 +780,8 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         {proposedPlaces.length === 0 ? <div className="text-sm text-gray-400 italic">Aucune proposition.</div> : 
-                          proposedPlaces.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(p => {
-                            const stats = getRatingStats(p.ratings);
+proposedPlaces.map(p => {
+                              const stats = getRatingStats(p.ratings);
                             return (
                               <div key={p.id} className="bg-white p-4 rounded-xl border shadow-sm relative group overflow-hidden">
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
@@ -820,8 +820,7 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                     <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
                       <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Sanctuariser le Gîte (Admin)</h3>
                       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                        <select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.sort((a,b) => getRatingStats(b.ratings).consensus - getRatingStats(a.ratings).consensus).map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>
-                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
+<select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
                       </div>
                       <p className="text-xs text-indigo-500 font-medium">Le verrouillage débloquera l'accès au planning, repas, activités et comptes pour tout le groupe.</p>
                     </div>
