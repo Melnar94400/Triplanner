@@ -49,7 +49,7 @@ export default function TripPage() {
   const [error, setError] = useState<string | null>(null)
   const [settlements, setSettlements] = useState<any[]>([])
   const [weather, setWeather] = useState<any[] | null>(null)
-  
+  const [showMembersModal, setShowMembersModal] = useState(false);
   // Destination States
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
@@ -235,7 +235,15 @@ export default function TripPage() {
   // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
   const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin'
   const isLocked = trip?.is_planning_locked
-
+const handleRemoveMember = async (memberId: string) => {
+  if (!confirm("Voulez-vous vraiment retirer cette personne du voyage ?")) return;
+  try {
+    await supabase.from('trip_members').delete().eq('trip_id', tripId).eq('user_id', memberId);
+    fetchTripData();
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
   const handleSaveWeek = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
     if(!newWeek.trim()) return;
@@ -583,7 +591,13 @@ export default function TripPage() {
             className="mt-4 flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit group"
           >
             <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien
-          </button>        
+          </button>
+          <button 
+  onClick={() => setShowMembersModal(true)} 
+  className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors shadow-sm w-fit"
+>
+  <Users size={14} /> {members.length} participant(s)
+</button>        
         </div>
         
         <nav className="flex-1 px-4 space-y-2 mt-2">
@@ -609,7 +623,10 @@ export default function TripPage() {
           <div><button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1"><ChevronLeft size={12} /> Retour</button><h1 className="font-black text-indigo-600 text-lg truncate max-w-[200px]">{trip.name}</h1></div>
           <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Users size={16} /></button>
         </div>       
-
+<div className="flex gap-2">
+  <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"><Users size={16} /></button>
+  <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"><Users size={16} /></button>
+</div>
         <div className="p-4 md:p-8">
           
           {/* ONGLET DESTINATION (PHASÉ) */}
@@ -1275,6 +1292,41 @@ export default function TripPage() {
           )}
         </div>
       </main>
+  {/* === MODALE DE GESTION DES MEMBRES === */}
+{showMembersModal && (
+  <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-lg text-gray-800">Équipe ({members.length})</h3>
+        <button onClick={() => setShowMembersModal(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
+      </div>
+      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+        {members.map(m => (
+          <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-indigo-200">
+                {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
+              </div>
+              <div>
+                <div className="text-sm font-bold text-gray-800">{m.name} {m.id === currentUser?.id && <span className="text-indigo-500">(Moi)</span>}</div>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{m.role}</div>
+              </div>
+            </div>
+            {isAdmin && m.id !== currentUser?.id && (
+              <button 
+                onClick={() => handleRemoveMember(m.id)} 
+                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white border border-red-100" 
+                title="Exclure du voyage"
+              >
+                <Trash2 size={16}/>
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
       <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-3 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}><div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div><span className="text-[10px] mt-1">Destination</span></button>
@@ -1284,5 +1336,7 @@ export default function TripPage() {
         <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'expenses' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><PieChart size={20} /><span className="text-[10px] mt-1">Comptes</span></button>
       </nav>
     </div>
+    
   )
+
 }
