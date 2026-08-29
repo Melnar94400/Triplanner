@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Injection de la palette "primary" dynamique */
+  /* La couleur "primary" pilote désormais uniquement les accents (boutons, icônes) */
   --color-primary-50: var(--p-50);
   --color-primary-100: var(--p-100);
   --color-primary-200: var(--p-200);
@@ -15,93 +15,101 @@
 }
 
 /* =======================================================
-   1. MODE CLAIR (Ambiances très prononcées et pastel)
+   1. MODE CLAIR (Thèmes Bi-Couleurs)
    ======================================================= */
 
-/* VIOLET (Défaut) */
-:root, html[data-theme='violet'] {
-  --p-50: #eef2ff; --p-100: #e0e7ff; --p-200: #c7d2fe; --p-300: #a5b4fc; --p-400: #818cf8;
-  --p-500: #6366f1; --p-600: #4f46e5; --p-700: #4338ca; --p-800: #3730a3; --p-900: #312e81;
-  --bg-page: #eff2ff;
-  --bg-card: #ffffff;
-  --border-color: #d1dcff;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --input-bg: #ffffff;
-}
-
-/* VERT SAUGE (Ton vert bien prononcé) */
-html[data-theme='green'] {
-  --p-50: #ecfdf5; --p-100: #d1fae5; --p-200: #a7f3d0; --p-300: #6ee7b7; --p-400: #34d399;
-  --p-500: #10b981; --p-600: #059669; --p-700: #047857; --p-800: #065f46; --p-900: #064e3b;
+/* THEME 1 : SAUGE & TERRACOTTA (Défaut) */
+:root, html[data-theme='sauge-terracotta'] {
+  /* Accent: Terracotta */
+  --p-50: #fff7ed; --p-100: #ffedd5; --p-200: #fed7aa; --p-300: #fdba74; --p-400: #fb923c;
+  --p-500: #ea580c; --p-600: #c2410c; --p-700: #9a3412; --p-800: #7c2d12; --p-900: #431407;
+  /* Fond: Sauge */
   --bg-page: #97b5a5;
   --bg-card: #c0e8cd;
-  --border-color: #a3d4b8;
+  --border-color: #a8d4b7;
   --text-main: #16221a;
   --text-muted: #2c3d31;
-  --input-bg: #f0fdf4;
+  --input-bg: #e6f2eb;
 }
 
-/* NEUTRAL (Gris Perle / Ardoise) */
-html[data-theme='neutral'] {
-  --p-50: #f8fafc; --p-100: #f1f5f9; --p-200: #e2e8f0; --p-300: #cbd5e1; --p-400: #94a3b8;
-  --p-500: #64748b; --p-600: #475569; --p-700: #334155; --p-800: #1e293b; --p-900: #0f172a;
-  --bg-page: #e2e8f0;
-  --bg-card: #f8fafc;
-  --border-color: #cbd5e1;
-  --text-main: #0f172a;
-  --text-muted: #475569;
+/* THEME 2 : LAVANDE & MOUTARDE */
+html[data-theme='lavande-moutarde'] {
+  /* Accent: Moutarde */
+  --p-50: #fefce8; --p-100: #fef9c3; --p-200: #fef08a; --p-300: #fde047; --p-400: #facc15;
+  --p-500: #eab308; --p-600: #ca8a04; --p-700: #a16207; --p-800: #854d0e; --p-900: #713f12;
+  /* Fond: Lavande */
+  --bg-page: #dbeafe;
+  --bg-card: #eff6ff;
+  --border-color: #bfdbfe;
+  --text-main: #1e3a8a;
+  --text-muted: #3b82f6;
   --input-bg: #ffffff;
 }
 
-/* ROSE PASTEL */
-html[data-theme='rose'] {
-  --p-50: #fff1f2; --p-100: #ffe4e6; --p-200: #fecdd3; --p-300: #fda4af; --p-400: #fb7185;
-  --p-500: #f43f5e; --p-600: #e11d48; --p-700: #be123c; --p-800: #9f1239; --p-900: #881337;
-  --bg-page: #ffe4e6;
-  --bg-card: #fff1f2;
+/* THEME 3 : SABLE & AZUR */
+html[data-theme='sable-azur'] {
+  /* Accent: Azur */
+  --p-50: #f0f9ff; --p-100: #e0f2fe; --p-200: #bae6fd; --p-300: #7dd3fc; --p-400: #38bdf8;
+  --p-500: #0ea5e9; --p-600: #0284c7; --p-700: #0369a1; --p-800: #075985; --p-900: #0c4a6e;
+  /* Fond: Sable */
+  --bg-page: #e8dfc8;
+  --bg-card: #f5eedc;
+  --border-color: #d1c4a5;
+  --text-main: #422006;
+  --text-muted: #78350f;
+  --input-bg: #fdfbf7;
+}
+
+/* THEME 4 : ROSE & SAPIN */
+html[data-theme='rose-sapin'] {
+  /* Accent: Sapin */
+  --p-50: #ecfdf5; --p-100: #d1fae5; --p-200: #a7f3d0; --p-300: #6ee7b7; --p-400: #34d399;
+  --p-500: #10b981; --p-600: #059669; --p-700: #047857; --p-800: #065f46; --p-900: #064e3b;
+  /* Fond: Rose Pastel */
+  --bg-page: #fbcfe8;
+  --bg-card: #ffe4e6;
   --border-color: #fecdd3;
   --text-main: #4c0519;
-  --text-muted: #be123c;
-  --input-bg: #ffffff;
+  --text-muted: #881337;
+  --input-bg: #fff1f2;
 }
 
 /* =======================================================
-   2. MODE SOMBRE (Nuit immersif selon le thème)
+   2. MODE SOMBRE (Adapté à chaque bi-couleur)
    ======================================================= */
 
-/* Nuit Violette */
-html.dark, html.dark[data-theme='violet'] {
-  --bg-page: #0a0b1a;
-  --bg-card: #131530;
-  --border-color: #21255c;
+/* Nuit Forêt (Sauge/Terracotta) */
+html.dark, html.dark[data-theme='sauge-terracotta'] {
+  --bg-page: #141f19;
+  --bg-card: #1e2d24;
+  --border-color: #2c4033;
+  --text-main: #d4e2d8;
+  --text-muted: #8ea898;
+  --input-bg: #141f19;
+}
+
+/* Nuit Indigo (Lavande/Moutarde) */
+html.dark[data-theme='lavande-moutarde'] {
+  --bg-page: #0f1123;
+  --bg-card: #161836;
+  --border-color: #232754;
   --text-main: #e0e7ff;
   --text-muted: #818cf8;
-  --input-bg: #0d0f24;
+  --input-bg: #0f1123;
 }
 
-/* Nuit Forêt (Vert Sombre) */
-html.dark[data-theme='green'] {
-  --bg-page: #0a1f16;
-  --bg-card: #113324;
-  --border-color: #1e523b;
-  --text-main: #d1fae5;
-  --text-muted: #6ee7b7;
-  --input-bg: #0a1f16;
+/* Nuit Terre (Sable/Azur) */
+html.dark[data-theme='sable-azur'] {
+  --bg-page: #1c1a17;
+  --bg-card: #292621;
+  --border-color: #3d3932;
+  --text-main: #e8dfc8;
+  --text-muted: #a39575;
+  --input-bg: #1c1a17;
 }
 
-/* Nuit Ardoise (Neutral) */
-html.dark[data-theme='neutral'] {
-  --bg-page: #09090b;
-  --bg-card: #18181b;
-  --border-color: #27272a;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --input-bg: #09090b;
-}
-
-/* Nuit Rubis (Rose Sombre) */
-html.dark[data-theme='rose'] {
+/* Nuit Rubis (Rose/Sapin) */
+html.dark[data-theme='rose-sapin'] {
   --bg-page: #2e0814;
   --bg-card: #4d0d21;
   --border-color: #7a1535;
@@ -111,7 +119,7 @@ html.dark[data-theme='rose'] {
 }
 
 /* =======================================================
-   3. APPLICATION GLOBALE ET MAGIQUE
+   3. APPLICATION GLOBALE
    ======================================================= */
 
 body {
@@ -120,7 +128,6 @@ body {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* On intercepte les classes Tailwind en dur pour leur injecter l'ambiance */
 @layer base {
   .bg-white, .bg-gray-50, .bg-gray-100 {
     background-color: var(--bg-card) !important;
@@ -140,7 +147,6 @@ body {
     color: var(--text-muted) !important;
   }
 
-  /* Formulaires qui s'adaptent */
   input, select, textarea {
     background-color: var(--input-bg) !important;
     color: var(--text-main) !important;
@@ -148,13 +154,13 @@ body {
   }
   
   input:focus, select:focus, textarea:focus {
-    border-color: var(--p-500) !important;
+    border-color: var(--color-primary-500) !important;
     outline: none !important;
-    box-shadow: 0 0 0 2px var(--p-500) !important;
+    box-shadow: 0 0 0 2px var(--color-primary-500) !important;
   }
 }
 
 ::selection {
-  background-color: var(--p-300);
+  background-color: var(--color-primary-300);
   color: #ffffff;
 }

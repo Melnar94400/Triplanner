@@ -708,11 +708,11 @@ export default function TripPage() {
         </div>
 <div className="flex gap-3 mt-4 items-center">
   <span className="text-xs font-bold text-gray-400 uppercase">Thème</span>
-  <button onClick={() => changeTheme('violet')} className={`w-5 h-5 rounded-full bg-[#4f46e5] transition-transform ${appTheme === 'violet' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('green')} className={`w-5 h-5 rounded-full bg-[#059669] transition-transform ${appTheme === 'green' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('neutral')} className={`w-5 h-5 rounded-full bg-[#64748b] transition-transform ${appTheme === 'neutral' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('rose')} className={`w-5 h-5 rounded-full bg-[#e11d48] transition-transform ${appTheme === 'rose' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-</div>        
+  <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('rose-sapin')} title="Rose & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+</div>
         <nav className="flex-1 px-4 space-y-2 mt-2">
           <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'}`}>
             <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
