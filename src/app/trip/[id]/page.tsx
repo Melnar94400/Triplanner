@@ -706,19 +706,14 @@ export default function TripPage() {
             <Users size={14} /> {members.length} participant(s)
           </button>        
         </div>
-<div className="mt-4">
-  <span className="text-xs font-bold text-gray-400 uppercase mb-2 block">Thème</span>
-  <div className="grid grid-cols-4 gap-2 w-fit">
-    <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('rose-sapin')} title="Rose Pastel & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('cafe-menthe')} title="Café & Menthe" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#d6d3d1] to-[#0d9488] transition-transform ${appTheme === 'cafe-menthe' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('ocean-corail')} title="Océan & Corail" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#cbd5e1] to-[#e11d48] transition-transform ${appTheme === 'ocean-corail' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('amethyste-or')} title="Améthyste & Or" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e9d5ff] to-[#d97706] transition-transform ${appTheme === 'amethyste-or' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-    <button onClick={() => changeTheme('ciel-cerise')} title="Ciel & Cerise" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#bae6fd] to-[#db2777] transition-transform ${appTheme === 'ciel-cerise' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  </div>
-</div>        <nav className="flex-1 px-4 space-y-2 mt-2">
+        <div className="flex gap-3 mt-4 items-center">
+  <span className="text-xs font-bold text-gray-400 uppercase">Thème</span>
+  <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('rose-sapin')} title="Rose & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+        </div>
+        <nav className="flex-1 px-4 space-y-2 mt-2">
           <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'}`}>
             <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
             {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
@@ -736,21 +731,39 @@ export default function TripPage() {
         <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-primary-100/60 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-        <div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
-          <div>
-            <button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1">
-              <ChevronLeft size={12} /> Retour
+<main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+        
+        {/* EN-TÊTE MOBILE & THÈMES */}
+        <div className="md:hidden bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+          <div className="p-4 flex items-center justify-between">
+            <div>
+              <button onClick={() => router.push('/')} className="text-xs text-gray-400 hover:text-primary-600 flex items-center gap-1 mb-1 transition-colors">
+                <ChevronLeft size={12} /> Retour
+              </button>
+              <h1 className="font-black text-primary-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
+            </div>
+            <button 
+              onClick={() => setShowMembersModal(true)} 
+              className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors"
+            >
+              <Users size={18} />
             </button>
-            <h1 className="font-black text-primary-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
           </div>
-          <button 
-            onClick={() => setShowMembersModal(true)} 
-            className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors"
-          >
-            <Users size={18} />
-          </button>
+          
+          {/* Barre des thèmes défilable sur mobile */}
+          <div className="px-4 pb-3 flex items-center gap-3 overflow-x-auto hide-scrollbar">
+            <button onClick={() => changeTheme('sauge-terracotta')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('lavande-moutarde')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('sable-azur')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('rose-sapin')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('cafe-menthe')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#d6d3d1] to-[#0d9488] transition-transform ${appTheme === 'cafe-menthe' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('ocean-corail')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#cbd5e1] to-[#e11d48] transition-transform ${appTheme === 'ocean-corail' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('amethyste-or')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#e9d5ff] to-[#d97706] transition-transform ${appTheme === 'amethyste-or' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+            <button onClick={() => changeTheme('ciel-cerise')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#bae6fd] to-[#db2777] transition-transform ${appTheme === 'ciel-cerise' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+          </div>
         </div>
+        
+        {/* === INJECTION DE LA DATALIST GLOBALE === */}
         
         {/* === INJECTION DE LA DATALIST GLOBALE === */}
         <datalist id="ingredients-list">
