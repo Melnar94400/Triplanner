@@ -30,13 +30,15 @@ const SLOT_ORDER: Record<string, number> = { 'Matin': 1, 'Déjeuner': 2, 'Après
 
 // --- CATÉGORIES POUR LA LISTE DE COURSES ---
 const SHOPPING_CATEGORIES = ['Fruits & Légumes', 'Viandes & Poissons', 'Frais & Laitier', 'Épicerie', 'Boissons', 'Divers'];
-const guessCategory = (name: string) => {
-  const n = name.toLowerCase();
-  if (n.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
-  if (n.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
-  if (n.match(/lait|beurre|crème|fromage|oeuf|yaourt|mozzarella|feta|gruyère/)) return 'Frais & Laitier';
-  if (n.match(/eau|vin|bière|jus|coca|soda|café|thé/)) return 'Boissons';
-  if (n.match(/pâte|riz|farine|sucre|sel|poivre|huile|vinaigre|moutarde|épice|chocolat|pain/)) return 'Épicerie';
+const guessCategory = (name: string, customCategories: any = {}) => {
+  const key = name.toLowerCase().trim();
+  if (customCategories && customCategories[key]) return customCategories[key]; // Priorité au choix de l'utilisateur
+
+  if (key.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
+  if (key.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
+  if (key.match(/lait|beurre|crème|fromage|oeuf|yaourt|mozzarella|feta|gruyère/)) return 'Frais & Laitier';
+  if (key.match(/eau|vin|bière|jus|coca|soda|café|thé/)) return 'Boissons';
+  if (key.match(/pâte|riz|farine|sucre|sel|poivre|huile|vinaigre|moutarde|épice|chocolat|pain/)) return 'Épicerie';
   return 'Divers';
 }
 
@@ -422,23 +424,41 @@ export default function TripPage() {
   const handleAddExtraItem = async (e: React.FormEvent) => { e.preventDefault(); if (!newExtraItem.trim()) return; await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); };
   const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
   
+  // Fonction appelée quand l'utilisateur change la catégorie via le menu déroulant
+  const handleChangeCategory = async (itemId: string, newCategory: string) => {
+    const item = shoppingList.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const key = item.name.toLowerCase().trim();
+    const newCustomCategories = { ...(trip?.custom_categories || {}), [key]: newCategory };
+    
+    // Mise à jour optimiste pour que l'interface réagisse immédiatement
+    setTrip((prev: any) => ({ ...prev, custom_categories: newCustomCategories }));
+    
+    // Sauvegarde en base
+    await supabase.from('trips').update({ custom_categories: newCustomCategories }).eq('id', tripId);
+  };
+
   const shoppingList = React.useMemo(() => {
     const list: Record<string, any> = {}
+    const customMapping = trip?.custom_categories || {};
+
     meals.forEach(meal => {
       meal.ingredients?.forEach(ing => {
         if (!ing.name) return
         const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-gray-100 text-gray-700';
-        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name) }
+        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name, customMapping) }
         else { if (ing.qty && !list[key].qtys.includes(ing.qty)) list[key].qtys.push(ing.qty); if (!list[key].tags.some((t: any) => t.text === tagText)) list[key].tags.push({ text: tagText, color: tagColor }) }
       })
     })
     extraItems.forEach(item => {
       const key = item.name.toLowerCase().trim();
-      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name) }
+      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name, customMapping) }
       else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-gray-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
     });
     return Object.values(list).map(item => ({ ...item, displayQty: item.qtys.join(' + ') }))
-  }, [meals, extraItems])
+  }, [meals, extraItems, trip?.custom_categories])
+
   const toggleCheck = (id: string) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }))
 
   // --- ACTIVITÉS ---
@@ -657,10 +677,6 @@ export default function TripPage() {
           >
             <Users size={18} />
           </button>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"><Users size={16} /></button>
-          <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"><Users size={16} /></button>
         </div>
         
         {/* === INJECTION DE LA DATALIST === */}
@@ -1055,7 +1071,7 @@ export default function TripPage() {
             </div>
           )}
 
-          {/* REPAS & COURSES AVEC CATÉGORIES */}
+          {/* REPAS & COURSES AVEC CATÉGORIES ET SÉLECTEURS */}
           {activeTab === 'meals' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="flex-1 space-y-6">
@@ -1098,7 +1114,7 @@ export default function TripPage() {
                 </div>
               </div>
 
-              {/* LISTE DE COURSES AVEC CATÉGORIES */}
+              {/* LISTE DE COURSES AVEC SÉLECTEUR DE CATÉGORIE EN LIGNE */}
               <div className="w-full lg:w-96">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
                   <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-indigo-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
@@ -1119,9 +1135,27 @@ export default function TripPage() {
                           <div className="space-y-1.5">
                             {itemsInCategory.map((item, idx) => (
                               <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-gray-50 opacity-50 border-transparent' : 'bg-white hover:border-indigo-100 border-gray-100 shadow-sm'}`}>
-                                <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
-                                <div className="flex-1">
-                                  <div className="flex justify-between"><span className={`text-sm font-semibold ${checkedItems[item.id] ? 'line-through' : ''}`}>{item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}</span> {item.isExtra && <button onClick={(e) => handleDeleteExtraItem(item.dbId, e)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}</div>
+                                <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border shrink-0 ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-start gap-2">
+                                    <span className={`text-sm font-semibold truncate ${checkedItems[item.id] ? 'line-through' : ''}`}>
+                                      {item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}
+                                    </span>
+                                    
+                                    {/* --- NOUVEAU MENU DÉROULANT POUR MODIFIER LA CATÉGORIE --- */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <select 
+                                        value={item.category}
+                                        onChange={(e) => { e.stopPropagation(); handleChangeCategory(item.id, e.target.value); }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-[10px] font-bold bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 hover:border-indigo-300 hover:text-indigo-600 outline-none cursor-pointer shadow-sm transition-colors"
+                                      >
+                                        {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                      </select>
+                                      {item.isExtra && <button onClick={(e) => handleDeleteExtraItem(item.dbId, e)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}
+                                    </div>
+
+                                  </div>
                                   <div className="flex flex-wrap gap-1 mt-1">{item.tags.map((t:any, i:number) => <span key={i} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${t.color}`}>{t.text}</span>)}</div>
                                 </div>
                               </div>
