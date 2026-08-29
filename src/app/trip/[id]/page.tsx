@@ -40,7 +40,7 @@ export default function TripPage() {
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
-
+  const [selectedPlanningDay, setSelectedPlanningDay] = useState('Samedi (Arrivée)')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [activeTab, setActiveTab] = useState('destination')
@@ -913,86 +913,87 @@ proposedPlaces.map(p => {
                 </div>
               )}
 
-              <div className="space-y-6">
-                {WEEK_DAYS.map(day => (
-                  <div key={day} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-50 flex items-center justify-between"><span className="font-black text-indigo-800 text-lg uppercase tracking-tight">{day}</span></div>
-                    <div className="divide-y divide-gray-50">
-                      {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(slot => {
-                        const slotMeals = meals.filter(m => m.day === day && m.type === slot);
-                        const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
-                        
-                        return (
-                          <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
-                            <div className="w-32 flex-shrink-0 flex flex-col gap-2">
-                              <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
-                              {(() => {
-                                const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
-                                return (
-                                  <div className="flex flex-col gap-3 mt-2">
-                                    <button 
-                                      onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
-                                      className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
-                                    >
-                                      <Camera size={14} /> Ajouter des photos
-                                    </button>
-                                    
-                                    {slotPhotos.length > 0 && (
-                                      <div className="flex flex-wrap gap-2">
-{slotPhotos.map((photo: any, idx: number) => (
-  <div key={photo.id} className="w-14 h-14 relative group">
-    {photo.media_type === 'video' ? (
-      <>
-        <video 
-          src={photo.file_path} 
-          className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" 
-          onClick={() => openViewer(slotPhotos, idx)} 
-        />
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white">
-            <Play size={10} fill="currentColor" />
-          </div>
-        </div>
-      </>
-    ) : (
-      <img 
-        src={photo.file_path} 
-        alt="Souvenir" 
-        onClick={() => openViewer(slotPhotos, idx)}
-        className="w-full h-full object-cover rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" 
-      />
-    )}
-  </div>
-))}                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {slotMeals.map(meal => (
-                                <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
-                              ))}
-                              {slotActivities.map(act => (
-                                <div key={`act-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
-                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
-                                  <div className="flex justify-between items-start">
-                                    <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
-                                    {act.address && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(act.address)}`} target="_blank" rel="noreferrer" title="Lancer le GPS" className="bg-white p-1.5 rounded-lg border text-indigo-500 hover:bg-indigo-50"><MapIcon size={14} /></a>}
-                                  </div>
-                                  {act.durationFromAcc && <div className="mt-2 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-1.5 py-0.5 rounded flex items-center gap-1"><Car size={10}/> {act.durationFromAcc}</div>}
-                                </div>
-                              ))}
-                              {slotMeals.length === 0 && slotActivities.length === 0 && <div className="text-gray-300 text-sm font-medium italic">Quartier libre...</div>}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+<div className="space-y-4">
+                {/* --- NAVIGATION DES JOURS (ONGLETS) --- */}
+                <div className="flex overflow-x-auto gap-2 pb-2 snap-x hide-scrollbar sticky top-[60px] md:top-0 z-10 bg-gray-50/95 backdrop-blur-sm pt-2 -mx-4 px-4 md:mx-0 md:px-0">
+                  {WEEK_DAYS.map(day => (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedPlanningDay(day)}
+                      className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${selectedPlanningDay === day ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+
+                {/* --- CONTENU DU JOUR SÉLECTIONNÉ --- */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-50 flex items-center justify-between">
+                    <span className="font-black text-indigo-800 text-lg uppercase tracking-tight">{selectedPlanningDay}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="divide-y divide-gray-50">
+                    {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(slot => {
+                      const day = selectedPlanningDay;
+                      const slotMeals = meals.filter(m => m.day === day && m.type === slot);
+                      const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
+                      
+                      return (
+                        <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
+                          <div className="w-32 flex-shrink-0 flex flex-col gap-2">
+                            <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
+                            {(() => {
+                              const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
+                              return (
+                                <div className="flex flex-col gap-3 mt-2">
+                                  <button 
+                                    onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
+                                    className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
+                                  >
+                                    <Camera size={14} /> Photos
+                                  </button>
+                                  
+                                  {slotPhotos.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {slotPhotos.map((photo: any, idx: number) => (
+                                        <div key={photo.id} className="w-14 h-14 relative group">
+                                          {photo.media_type === 'video' ? (
+                                            <>
+                                              <video src={photo.file_path} className="w-full h-full object-cover rounded-xl border shadow-sm cursor-pointer" onClick={() => openViewer(slotPhotos, idx)} />
+                                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white"><Play size={10} fill="currentColor" /></div></div>
+                                            </>
+                                          ) : (
+                                            <img src={photo.file_path} alt="Souvenir" onClick={() => openViewer(slotPhotos, idx)} className="w-full h-full object-cover rounded-xl border shadow-sm cursor-pointer" />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {slotMeals.map(meal => (
+                              <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
+                            ))}
+                            {slotActivities.map(act => (
+                              <div key={`act-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                                <div className="flex justify-between items-start">
+                                  <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
+                                </div>
+                                {act.durationFromAcc && <div className="mt-2 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-1.5 py-0.5 rounded flex items-center gap-1"><Car size={10}/> {act.durationFromAcc}</div>}
+                              </div>
+                            ))}
+                            {slotMeals.length === 0 && slotActivities.length === 0 && <div className="text-gray-300 text-sm font-medium italic">Quartier libre...</div>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>            </div>
           )}
 
           {/* ACTIVITÉS */}
