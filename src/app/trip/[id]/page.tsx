@@ -706,14 +706,19 @@ export default function TripPage() {
             <Users size={14} /> {members.length} participant(s)
           </button>        
         </div>
-<div className="flex gap-3 mt-4 items-center">
-  <span className="text-xs font-bold text-gray-400 uppercase">Thème</span>
-  <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('rose-sapin')} title="Rose & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-</div>
-        <nav className="flex-1 px-4 space-y-2 mt-2">
+<div className="mt-4">
+  <span className="text-xs font-bold text-gray-400 uppercase mb-2 block">Thème</span>
+  <div className="grid grid-cols-4 gap-2 w-fit">
+    <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('rose-sapin')} title="Rose Pastel & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('cafe-menthe')} title="Café & Menthe" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#d6d3d1] to-[#0d9488] transition-transform ${appTheme === 'cafe-menthe' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('ocean-corail')} title="Océan & Corail" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#cbd5e1] to-[#e11d48] transition-transform ${appTheme === 'ocean-corail' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('amethyste-or')} title="Améthyste & Or" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e9d5ff] to-[#d97706] transition-transform ${appTheme === 'amethyste-or' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+    <button onClick={() => changeTheme('ciel-cerise')} title="Ciel & Cerise" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#bae6fd] to-[#db2777] transition-transform ${appTheme === 'ciel-cerise' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  </div>
+</div>        <nav className="flex-1 px-4 space-y-2 mt-2">
           <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'}`}>
             <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
             {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
