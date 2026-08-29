@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Cropper from 'react-easy-crop'
-import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock } from 'lucide-react'
+import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock, Trash2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Moon, Sun } from 'lucide-react'
 
@@ -154,11 +154,29 @@ export default function ProfilePage() {
     router.push('/login')
   }
 
+  // Suppression du compte
+  const handleDeleteAccount = async () => {
+    const confirmDelete = window.confirm("🚨 Attention ! Es-tu sûr de vouloir supprimer définitivement ton compte ? Cette action est irréversible.")
+    if (!confirmDelete) return
+
+    setSaving(true)
+    try {
+      const { error } = await supabase.rpc('delete_own_account')
+      if (error) throw error
+
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (err: any) {
+      alert("Erreur lors de la suppression : " + err.message)
+      setSaving(false)
+    }
+  }
+
   if (loading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-gray-400" /></div>
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6">
+      <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6 my-8">
         <div className="flex justify-between items-center mb-2">
           <button onClick={() => router.push('/')} className="text-gray-400 hover:text-indigo-600 flex items-center gap-1 text-sm font-bold transition-colors">
             <ChevronLeft size={16} /> Retour
@@ -169,7 +187,7 @@ export default function ProfilePage() {
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} Thème
           </button>
-          <button onClick={handleLogout} className="text-red-400 hover:text-red-600 text-sm font-bold flex items-center gap-1 transition-colors">
+          <button onClick={handleLogout} className="text-gray-400 hover:text-gray-800 text-sm font-bold flex items-center gap-1 transition-colors">
             <LogOut size={14} /> Déconnexion
           </button>
         </div>
@@ -251,6 +269,27 @@ export default function ProfilePage() {
             </button>
           </form>
         </div>
+
+        <hr className="border-gray-100 my-4" />
+
+        {/* SECTION ZONE DE DANGER */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-red-600 flex items-center gap-2">
+            <Trash2 size={16} /> Zone de danger
+          </h3>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            La suppression de ton compte est immédiate et irréversible. Toutes tes données et tes participations aux voyages seront perdues.
+          </p>
+          <button 
+            onClick={handleDeleteAccount}
+            disabled={saving}
+            className="w-full bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl font-bold text-sm hover:bg-red-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            Supprimer mon compte définitivement
+          </button>
+        </div>
+
       </div>
 
       {/* --- MODALE DE RECADRAGE --- */}
