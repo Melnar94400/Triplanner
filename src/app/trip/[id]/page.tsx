@@ -43,6 +43,22 @@ const guessCategory = (name: string, globalDict: Record<string, string> = {}) =>
 }
 
 export default function TripPage() {
+
+  // État du thème
+  const [appTheme, setAppTheme] = useState('violet')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('trip-theme') || 'violet'
+    setAppTheme(saved)
+    document.documentElement.setAttribute('data-theme', saved)
+  }, [])
+
+  const changeTheme = (t: string) => {
+    setAppTheme(t)
+    localStorage.setItem('trip-theme', t)
+    document.documentElement.setAttribute('data-theme', t)
+  }
+
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
@@ -668,21 +684,21 @@ export default function TripPage() {
     : mediaItems;
 
   if (loading && !trip) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
-  if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
+  if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-primary-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
       <aside className="hidden md:flex flex-col w-64 border-r bg-white shadow-sm z-10">
         <div className="p-6">
-          <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-indigo-600 mb-4 transition-colors"><ChevronLeft size={14} /> Mes voyages</button>
-          <h1 className="text-xl font-black text-indigo-600 tracking-tight truncate">{trip.name}</h1>
+          <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-primary-600 mb-4 transition-colors"><ChevronLeft size={14} /> Mes voyages</button>
+          <h1 className="text-xl font-black text-primary-600 tracking-tight truncate">{trip.name}</h1>
           <button 
             onClick={() => { 
               const inviteLink = `${window.location.origin}/join/${trip.invite_code}`;
               navigator.clipboard.writeText(inviteLink); 
               alert("Lien d'invitation copié ! Envoie-le à tes potes 🚀"); 
             }} 
-            className="mt-4 flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit group"
+            className="mt-4 flex items-center gap-2 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-2 rounded-xl hover:bg-primary-100 transition-colors shadow-sm w-fit group"
           >
             <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien
           </button>
@@ -690,23 +706,29 @@ export default function TripPage() {
             <Users size={14} /> {members.length} participant(s)
           </button>        
         </div>
-        
+<div className="flex gap-3 mt-4 items-center">
+  <span className="text-xs font-bold text-gray-400 uppercase">Thème</span>
+  <button onClick={() => changeTheme('violet')} className={`w-5 h-5 rounded-full bg-[#4f46e5] transition-transform ${appTheme === 'violet' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('green')} className={`w-5 h-5 rounded-full bg-[#059669] transition-transform ${appTheme === 'green' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('neutral')} className={`w-5 h-5 rounded-full bg-[#64748b] transition-transform ${appTheme === 'neutral' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+  <button onClick={() => changeTheme('rose')} className={`w-5 h-5 rounded-full bg-[#e11d48] transition-transform ${appTheme === 'rose' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
+</div>        
         <nav className="flex-1 px-4 space-y-2 mt-2">
-          <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}>
             <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
             {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
           </button>
 
           <div className="pt-4 mt-4 border-t border-gray-100">
             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 px-2">Organisation</p>
-            <button onClick={(e) => checkLock('calendar', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'calendar' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><CalendarDays size={20} /> Planning</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('activities', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'activities' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Compass size={20} /> Activités</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('meals', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'meals' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Utensils size={20} /> Repas & Courses</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('expenses', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'expenses' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><PieChart size={20} /> Comptes</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('gallery', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'gallery' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Camera size={20} /> Galerie</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('calendar', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'calendar' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><CalendarDays size={20} /> Planning</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('activities', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'activities' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Compass size={20} /> Activités</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('meals', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'meals' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Utensils size={20} /> Repas & Courses</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('expenses', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'expenses' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><PieChart size={20} /> Comptes</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('gallery', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'gallery' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Camera size={20} /> Galerie</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
           </div>
         </nav>
-        <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
+        <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
       </aside>
 
       <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
@@ -715,11 +737,11 @@ export default function TripPage() {
             <button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1">
               <ChevronLeft size={12} /> Retour
             </button>
-            <h1 className="font-black text-indigo-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
+            <h1 className="font-black text-primary-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
           </div>
           <button 
             onClick={() => setShowMembersModal(true)} 
-            className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"
+            className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors"
           >
             <Users size={18} />
           </button>
@@ -737,7 +759,7 @@ export default function TripPage() {
             <div className="max-w-6xl mx-auto space-y-8">
               {!trip.trip_region ? (
                 <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 to-blue-500"></div>
+                  <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-400 to-blue-500"></div>
                   <div className="mb-6">
                     <h2 className="font-black text-2xl text-gray-800 mb-2">Étape 1 : Où et Quand ? 🌍</h2>
                     <p className="text-gray-500 text-sm">Proposez et notez les zones géographiques. Le système valorise les choix qui font l'unanimité !</p>
@@ -745,14 +767,14 @@ export default function TripPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-primary-600"/> La semaine</h3>
                       <div className="space-y-3 mb-4">
                         {proposedWeeks.map(w => (
                           <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
                               {(isAdmin || w.by === currentUser?.id) && (
                                 <>
-                                  <button onClick={() => startEditWeek(w)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button>
+                                  <button onClick={() => startEditWeek(w)} className="p-1 bg-white border rounded text-gray-400 hover:text-primary-600 shadow-sm"><Pencil size={12}/></button>
                                   <button onClick={() => handleDeleteWeek(w.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button>
                                 </>
                               )}
@@ -761,7 +783,7 @@ export default function TripPage() {
                               <span className="font-semibold text-sm">{w.text}</span>
                               <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
-                                <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
+                                <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white text-gray-400 hover:text-primary-600'}`}><Check size={16} /></button>
                               </div>
                             </div>
                           </div>
@@ -774,14 +796,14 @@ export default function TripPage() {
                         </div>
                         <div className="flex gap-2">
                           <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Format libre (Ex: Mi-Août)" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
-                          <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">
+                          <button type="submit" disabled={!newWeek.trim()} className="bg-primary-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">
                             {editingWeekId ? <Check size={18}/> : <Plus size={18}/>}
                           </button>
                         </div>
                       </form>
                     </div>
                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-indigo-600"/> La Zone Géo</h3>
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-primary-600"/> La Zone Géo</h3>
                       <div className="space-y-3 mb-4">
                         {proposedRegions.map(r => {
                           const stats = getRatingStats(r.ratings);
@@ -789,12 +811,12 @@ export default function TripPage() {
                             <div key={r.id} className="bg-white p-3 rounded-xl border shadow-sm flex flex-col gap-2 relative group">
                               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
                                 {(isAdmin || r.by === currentUser?.id) && (
-                                  <><button onClick={() => startEditRegion(r)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button><button onClick={() => handleDeleteRegion(r.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button></>
+                                  <><button onClick={() => startEditRegion(r)} className="p-1 bg-white border rounded text-gray-400 hover:text-primary-600 shadow-sm"><Pencil size={12}/></button><button onClick={() => handleDeleteRegion(r.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button></>
                                 )}
                               </div>
                               <div className="flex justify-between items-center pr-12">
                                 <span className="font-semibold text-sm">{r.name}</span>
-                                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded" title={`Moyenne brute : ${stats.avg.toFixed(1)}\nDispersion (Écart type) : ${stats.sd.toFixed(2)}`}>
+                                <span className="text-xs font-bold text-primary-700 bg-primary-50 border border-primary-100 px-2 py-1 rounded" title={`Moyenne brute : ${stats.avg.toFixed(1)}\nDispersion (Écart type) : ${stats.sd.toFixed(2)}`}>
                                   Score : {stats.consensus.toFixed(1)}
                                 </span>
                               </div>
@@ -810,19 +832,19 @@ export default function TripPage() {
                       </div>
                       <form onSubmit={handleSaveRegion} className="flex gap-2 relative">
                         <input type="text" value={newRegion} onChange={e => setNewRegion(e.target.value)} placeholder="Ex: Bretagne Nord" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
-                        <button type="submit" disabled={!newRegion.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">{editingRegionId ? <Check size={18}/> : <Plus size={18}/>}</button>
+                        <button type="submit" disabled={!newRegion.trim()} className="bg-primary-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">{editingRegionId ? <Check size={18}/> : <Plus size={18}/>}</button>
                       </form>
                     </div>
                   </div>
 
                   {isAdmin ? (
-                    <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-                      <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Valider l'Étape 1 (Admin)</h3>
+                    <div className="bg-primary-50 p-5 rounded-2xl border border-primary-100">
+                      <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2"><Lock size={18} /> Valider l'Étape 1 (Admin)</h3>
                       <div className="flex flex-col md:flex-row gap-3 mb-4">
                         <select value={lockWeek} onChange={e => setLockWeek(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Semaine gagnante --</option>{proposedWeeks.map(w => <option key={w.id} value={w.text}>{w.text}</option>)}</select>
                         <select value={lockRegion} onChange={e => setLockRegion(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Région gagnante --</option>{proposedRegions.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}</select>
                       </div>
-                      <button onClick={handleLockPhase1} disabled={isLocking} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Valider et passer au choix du Gîte</button>
+                      <button onClick={handleLockPhase1} disabled={isLocking} className="w-full bg-primary-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-primary-700 disabled:opacity-50">Valider et passer au choix du Gîte</button>
                     </div>
                   ) : (
                     <div className="bg-orange-50 text-orange-700 p-4 rounded-xl text-sm font-medium border border-orange-100 flex items-start gap-3"><Lock size={20} className="flex-shrink-0" /> Un administrateur doit valider la région avant de chercher les gîtes.</div>
@@ -835,7 +857,7 @@ export default function TripPage() {
                   
                   <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4">
                     <div>
-                      <div className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider mb-2">Étape 2</div>
+                      <div className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider mb-2">Étape 2</div>
                       <h2 className="font-black text-2xl text-gray-800 leading-tight">Objectif : {trip.trip_region} 🏡</h2>
                       <p className="text-gray-500 text-sm font-semibold">{trip.trip_week}</p>
                     </div>
@@ -844,8 +866,8 @@ export default function TripPage() {
 
                   <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 mb-8">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><Home size={18} className="text-indigo-600"/> Les Gîtes trouvés</h3>
-                      <button onClick={() => setShowPlaceForm(true)} className="text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:text-indigo-600"><Plus size={14}/> Proposer un gîte</button>
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><Home size={18} className="text-primary-600"/> Les Gîtes trouvés</h3>
+                      <button onClick={() => setShowPlaceForm(true)} className="text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:text-primary-600"><Plus size={14}/> Proposer un gîte</button>
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -857,10 +879,10 @@ export default function TripPage() {
                               <div key={p.id} className="bg-white p-4 rounded-xl border shadow-sm relative group overflow-hidden">
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
                                   {(isAdmin || p.by === currentUser?.id) && (
-                                    <><button onClick={() => startEditPlace(p)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-indigo-600"><Pencil size={14}/></button><button onClick={() => handleDeletePlace(p.id)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></>
+                                    <><button onClick={() => startEditPlace(p)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-primary-600"><Pencil size={14}/></button><button onClick={() => handleDeletePlace(p.id)} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></>
                                   )}
                                 </div>
-                                <h4 className="font-bold text-gray-800 pr-14">{p.name} {p.link && <a href={p.link} target="_blank" className="text-indigo-500 ml-1"><ExternalLink size={12} className="inline"/></a>}</h4>
+                                <h4 className="font-bold text-gray-800 pr-14">{p.name} {p.link && <a href={p.link} target="_blank" className="text-primary-500 ml-1"><ExternalLink size={12} className="inline"/></a>}</h4>
                                 <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                   {p.price && <span className="font-semibold text-orange-600">{p.price} €</span>}
                                   {p.beds && <span>🛏️ {p.beds} pers.</span>}
@@ -874,7 +896,7 @@ export default function TripPage() {
                                       return <button key={star} onClick={() => handlePlaceRating(p.id, p.ratings, star)} className={myScore >= star ? 'text-yellow-400' : 'text-gray-200'}><Star size={20} fill={myScore >= star ? "currentColor" : "none"} /></button>
                                     })}
                                   </div>
-                                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded" title={`Moy: ${stats.avg.toFixed(1)} | Dispersion: ${stats.sd.toFixed(2)}`}>
+                                  <span className="text-xs font-bold text-primary-700 bg-primary-50 border border-primary-100 px-2 py-1 rounded" title={`Moy: ${stats.avg.toFixed(1)} | Dispersion: ${stats.sd.toFixed(2)}`}>
                                     Consensus : {stats.consensus.toFixed(1)}
                                   </span>
                                 </div>
@@ -888,13 +910,13 @@ export default function TripPage() {
                   </div>
 
                   {isAdmin ? (
-                    <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-                      <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Sanctuariser le Gîte (Admin)</h3>
+                    <div className="bg-primary-50 p-5 rounded-2xl border border-primary-100">
+                      <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2"><Lock size={18} /> Sanctuariser le Gîte (Admin)</h3>
                       <div className="flex flex-col sm:flex-row gap-3 mb-4">
                         <select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>
-                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
+                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-primary-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-primary-700 disabled:opacity-50">Verrouiller le voyage</button>
                       </div>
-                      <p className="text-xs text-indigo-500 font-medium">Le verrouillage débloquera l'accès au planning, repas, activités et comptes pour tout le groupe.</p>
+                      <p className="text-xs text-primary-500 font-medium">Le verrouillage débloquera l'accès au planning, repas, activités et comptes pour tout le groupe.</p>
                     </div>
                   ) : (
                     <div className="bg-orange-50 text-orange-700 p-4 rounded-xl text-sm font-medium border border-orange-100 flex items-start gap-3"><Lock size={20} className="flex-shrink-0" /> Un administrateur doit choisir le gîte final pour débloquer l'organisation.</div>
@@ -903,8 +925,8 @@ export default function TripPage() {
 
               ) : (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-indigo-100 shadow-md relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-primary-100 shadow-md relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-500 to-purple-500"></div>
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <div className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider mb-3"><Check size={12} /> Destination Sanctuarisée</div>
@@ -916,10 +938,10 @@ export default function TripPage() {
 
                     <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
-                        <div className="font-bold text-gray-800 text-lg flex items-center gap-2"><Home size={20} className="text-indigo-600"/> {trip.accommodation_name}</div>
+                        <div className="font-bold text-gray-800 text-lg flex items-center gap-2"><Home size={20} className="text-primary-600"/> {trip.accommodation_name}</div>
                         <div className="text-sm text-gray-500 flex items-center gap-1 mt-1"><MapPin size={14}/> {trip.accommodation_address}</div>
                       </div>
-                      <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(trip.accommodation_address)}`} target="_blank" rel="noreferrer" className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:text-indigo-600 flex items-center gap-2 whitespace-nowrap"><MapIcon size={16}/> Ouvrir le GPS</a>
+                      <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(trip.accommodation_address)}`} target="_blank" rel="noreferrer" className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:text-primary-600 flex items-center gap-2 whitespace-nowrap"><MapIcon size={16}/> Ouvrir le GPS</a>
                     </div>
 
                     <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-gray-50">
@@ -944,8 +966,8 @@ export default function TripPage() {
                   <input type="number" value={placeData.beds} onChange={e => setPlaceData({...placeData, beds: e.target.value})} placeholder="Nb. Couchages" className="w-full px-3 py-2 border rounded-xl text-sm" />
                 </div>
                 <input type="text" value={placeData.amenities} onChange={e => setPlaceData({...placeData, amenities: e.target.value})} placeholder="Atouts (Ex: Piscine, BBQ, Fibre)" className="w-full px-3 py-2 border rounded-xl text-sm" />
-                <input type="url" value={placeData.link} onChange={e => setPlaceData({...placeData, link: e.target.value})} placeholder="Lien (Airbnb, Booking...)" className="w-full px-3 py-2 border rounded-xl text-sm text-indigo-600" />
-                <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold mt-2">Enregistrer</button>
+                <input type="url" value={placeData.link} onChange={e => setPlaceData({...placeData, link: e.target.value})} placeholder="Lien (Airbnb, Booking...)" className="w-full px-3 py-2 border rounded-xl text-sm text-primary-600" />
+                <button type="submit" className="w-full bg-primary-600 text-white py-2.5 rounded-xl font-bold mt-2">Enregistrer</button>
               </form>
             </div>
           )}
@@ -956,7 +978,7 @@ export default function TripPage() {
               <h2 className="text-2xl font-bold text-gray-800">Planning de la semaine</h2>
               
               {weather && isLocked && (
-                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-5 text-white shadow-md flex overflow-x-auto gap-4 snap-x hide-scrollbar">
+                <div className="bg-gradient-to-br from-blue-500 to-primary-600 rounded-3xl p-5 text-white shadow-md flex overflow-x-auto gap-4 snap-x hide-scrollbar">
                   <div className="flex items-center gap-3 pr-4 border-r border-white/20 shrink-0">
                     <CloudSun size={36} className="text-blue-100" />
                     <div><div className="font-black text-lg">Météo</div><div className="text-xs text-blue-100 max-w-[120px] truncate">{trip.accommodation_name}</div></div>
@@ -980,7 +1002,7 @@ export default function TripPage() {
                     <button
                       key={day}
                       onClick={() => setSelectedPlanningDay(day)}
-                      className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${selectedPlanningDay === day ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                      className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${selectedPlanningDay === day ? 'bg-primary-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
                     >
                       {day}
                     </button>
@@ -988,8 +1010,8 @@ export default function TripPage() {
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-50 flex items-center justify-between">
-                    <span className="font-black text-indigo-800 text-lg uppercase tracking-tight">{selectedPlanningDay}</span>
+                  <div className="bg-primary-50/50 px-5 py-3 border-b border-primary-50 flex items-center justify-between">
+                    <span className="font-black text-primary-800 text-lg uppercase tracking-tight">{selectedPlanningDay}</span>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(slot => {
@@ -1007,7 +1029,7 @@ export default function TripPage() {
                                 <div className="flex flex-col gap-3 mt-2">
                                   <button 
                                     onClick={() => { setSelectedSlotForMedia({ day, slot }); setShowMediaUploadModal(true); }} 
-                                    className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm w-fit"
+                                    className="flex items-center gap-2 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-2 rounded-xl hover:bg-primary-100 transition-colors shadow-sm w-fit"
                                   >
                                     <Camera size={14} /> Photos
                                   </button>
@@ -1037,10 +1059,10 @@ export default function TripPage() {
                               <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
                             ))}
                             {slotActivities.map(act => (
-                              <div key={`act-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                              <div key={`act-${act.id}`} className="bg-primary-50/50 border border-primary-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500"></div>
                                 <div className="flex justify-between items-start">
-                                  <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
+                                  <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-primary-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
                                 </div>
                                 {act.durationFromAcc && <div className="mt-2 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-1.5 py-0.5 rounded flex items-center gap-1"><Car size={10}/> {act.durationFromAcc}</div>}
                               </div>
@@ -1059,7 +1081,7 @@ export default function TripPage() {
           {/* ACTIVITÉS */}
           {activeTab === 'activities' && (
             <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-gray-800">Boîte à idées</h2><button onClick={() => { resetActivityForm(); setShowActivityForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Proposer</button></div>
+              <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-gray-800">Boîte à idées</h2><button onClick={() => { resetActivityForm(); setShowActivityForm(true); }} className="bg-primary-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Proposer</button></div>
               {trip?.accommodation_lat && trip?.accommodation_lng && (
                 <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-white shadow-sm mb-6">
                   <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte des activités</div>
@@ -1070,13 +1092,13 @@ export default function TripPage() {
                 {activities.map(act => (
                   <div key={act.id} className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col group relative">
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100"><button onClick={() => editActivity(act)} className="p-1 bg-white border rounded"><Pencil size={14}/></button><button onClick={() => handleDeleteActivity(act.id)} className="p-1 bg-white border rounded text-red-500"><Trash2 size={14}/></button></div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2">{act.title} {act.link && <a href={act.link} target="_blank" className="text-indigo-500"><ExternalLink size={14} className="inline"/></a>}</h3>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">{act.title} {act.link && <a href={act.link} target="_blank" className="text-primary-500"><ExternalLink size={14} className="inline"/></a>}</h3>
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {act.price && <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">{act.price} €</span>}
+                      {act.price && <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-1 rounded">{act.price} €</span>}
                       {act.durationFromAcc && <span className="text-xs font-bold text-orange-700 bg-orange-50 px-2 py-1 rounded flex items-center gap-1" title="Temps de route"><Car size={12}/> {act.durationFromAcc}</span>}
                     </div>
                     {act.address && (
-                      <p className="text-xs text-gray-500 mb-2 flex items-start gap-1"><MapPin size={12} className="flex-shrink-0 mt-0.5" /> <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(act.address)}`} target="_blank" className="hover:text-indigo-600">{act.address}</a></p>
+                      <p className="text-xs text-gray-500 mb-2 flex items-start gap-1"><MapPin size={12} className="flex-shrink-0 mt-0.5" /> <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(act.address)}`} target="_blank" className="hover:text-primary-600">{act.address}</a></p>
                     )}
                     <p className="text-sm text-gray-600 mb-4 flex-1">{act.description}</p>
                     <div className="flex gap-2 mb-3">
@@ -1110,7 +1132,7 @@ export default function TripPage() {
                       <input type="number" value={actPrice} onChange={e => setActPrice(e.target.value)} placeholder="Prix (€)" className="border rounded-xl px-3 py-2"/>
                       <input type="url" value={actLink} onChange={e => setActLink(e.target.value)} placeholder="Lien Web" className="border rounded-xl px-3 py-2"/>
                     </div>
-                    <button type="submit" disabled={isSavingAct} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">{isSavingAct ? <Loader2 size={18} className="animate-spin" /> : "Valider"}</button>
+                    <button type="submit" disabled={isSavingAct} className="w-full bg-primary-600 text-white py-2.5 rounded-xl font-bold">{isSavingAct ? <Loader2 size={18} className="animate-spin" /> : "Valider"}</button>
                   </form>
                 </div>
               )}
@@ -1136,19 +1158,19 @@ export default function TripPage() {
                               <div className="flex-1 space-y-3">
                                 {meal && (
                                   <div className="group relative bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
-                                    <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-2"><button onClick={() => editMeal(meal)} className="p-1 border rounded bg-white text-gray-400 hover:text-indigo-600"><Pencil size={14}/></button><button onClick={() => handleDeleteMeal(meal.id)} className="p-1 border rounded bg-white text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></div>
-                                    <h3 className="font-bold text-lg mb-2">🍲 {meal.name} {meal.recipeLink && <a href={meal.recipeLink} target="_blank" className="text-indigo-500 text-xs"><ExternalLink size={10} className="inline"/></a>}</h3>
+                                    <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-2"><button onClick={() => editMeal(meal)} className="p-1 border rounded bg-white text-gray-400 hover:text-primary-600"><Pencil size={14}/></button><button onClick={() => handleDeleteMeal(meal.id)} className="p-1 border rounded bg-white text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></div>
+                                    <h3 className="font-bold text-lg mb-2">🍲 {meal.name} {meal.recipeLink && <a href={meal.recipeLink} target="_blank" className="text-primary-500 text-xs"><ExternalLink size={10} className="inline"/></a>}</h3>
                                     <div className="text-sm text-gray-500 space-y-1 mb-3">{meal.starter && <div>🥗 {meal.starter}</div>} {meal.dessert && <div>🍰 {meal.dessert}</div>} {meal.drinks && <div>🥂 {meal.drinks}</div>}</div>
                                     <div className="flex gap-2 flex-wrap">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
                                   </div>
                                 )}
                                 {mealActivities.map(act => (
-                                  <div key={`act-meal-${act.id}`} className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('activities')}>
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div><div className="text-[10px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> Activité / Resto</div><div className="font-bold text-gray-800 text-sm">{act.title}</div>
+                                  <div key={`act-meal-${act.id}`} className="bg-primary-50/50 border border-primary-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('activities')}>
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500"></div><div className="text-[10px] font-black text-primary-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> Activité / Resto</div><div className="font-bold text-gray-800 text-sm">{act.title}</div>
                                   </div>
                                 ))}
                                 {!meal && (
-                                  <button onClick={() => { resetMealForm(); setMealDay(day); setMealType(type); setShowMealForm(true); }} className={`w-full border-2 border-dashed rounded-xl flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 ${mealActivities.length > 0 ? 'h-10 text-xs' : 'h-12 text-sm'}`}><Plus size={14} className="mr-2" /> {mealActivities.length > 0 ? 'Ajouter quand même un repas' : 'Ajouter un repas'}</button>
+                                  <button onClick={() => { resetMealForm(); setMealDay(day); setMealType(type); setShowMealForm(true); }} className={`w-full border-2 border-dashed rounded-xl flex items-center justify-center text-gray-400 hover:text-primary-600 hover:bg-primary-50 ${mealActivities.length > 0 ? 'h-10 text-xs' : 'h-12 text-sm'}`}><Plus size={14} className="mr-2" /> {mealActivities.length > 0 ? 'Ajouter quand même un repas' : 'Ajouter un repas'}</button>
                                 )}
                               </div>
                             </div>
@@ -1163,12 +1185,12 @@ export default function TripPage() {
               {/* LISTE DE COURSES AVEC SÉLECTEUR DE CATÉGORIE EN LIGNE */}
               <div className="w-full lg:w-96">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
-                  <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-indigo-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
+                  <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-primary-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
                   
                   <form onSubmit={handleAddExtraItem} className="flex gap-2 mb-4">
                     <input type="text" list="ingredients-list" value={newExtraItem} onChange={e => setNewExtraItem(e.target.value)} placeholder="Article libre (Bières)" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
                     <input type="text" value={newExtraQty} onChange={e => setNewExtraQty(e.target.value)} placeholder="Qté" className="w-16 border rounded-xl px-2 py-2 text-sm" />
-                    <button type="submit" className="bg-indigo-600 text-white p-2 rounded-xl"><Plus size={18}/></button>
+                    <button type="submit" className="bg-primary-600 text-white p-2 rounded-xl"><Plus size={18}/></button>
                   </form>
                   
                   <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 pb-10">
@@ -1180,7 +1202,7 @@ export default function TripPage() {
                           <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-1 mb-2 text-sm">{category}</h4>
                           <div className="space-y-1.5">
                             {itemsInCategory.map((item, idx) => (
-                              <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-gray-50 opacity-50 border-transparent' : 'bg-white hover:border-indigo-100 border-gray-100 shadow-sm'}`}>
+                              <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-gray-50 opacity-50 border-transparent' : 'bg-white hover:border-primary-100 border-gray-100 shadow-sm'}`}>
                                 <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border shrink-0 ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-start gap-2">
@@ -1194,7 +1216,7 @@ export default function TripPage() {
                                         value={item.category}
                                         onChange={(e) => { e.stopPropagation(); handleChangeCategory(item.id, e.target.value); }}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="text-[10px] font-bold bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 hover:border-indigo-300 hover:text-indigo-600 outline-none cursor-pointer shadow-sm transition-colors"
+                                        className="text-[10px] font-bold bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 hover:border-primary-300 hover:text-primary-600 outline-none cursor-pointer shadow-sm transition-colors"
                                       >
                                         {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                       </select>
@@ -1222,11 +1244,11 @@ export default function TripPage() {
                     
                     <form onSubmit={handleSaveMeal} className="flex-1 overflow-y-auto flex flex-col">
                       <div className="p-5 space-y-4">
-                        <div className="font-bold text-indigo-700 bg-indigo-50 p-2 rounded">{mealDay} • {mealType}</div>
+                        <div className="font-bold text-primary-700 bg-primary-50 p-2 rounded">{mealDay} • {mealType}</div>
                         <input type="text" value={mealName} onChange={e => setMealName(e.target.value)} placeholder="Plat principal *" className="w-full px-3 py-2 border rounded-xl" autoFocus />
                         <div className="grid grid-cols-2 gap-3"><input type="text" value={mealStarter} onChange={e => setMealStarter(e.target.value)} placeholder="Entrée" className="border rounded-xl px-3 py-2" /><input type="text" value={mealDessert} onChange={e => setMealDessert(e.target.value)} placeholder="Dessert" className="border rounded-xl px-3 py-2" /></div>
                         <input type="text" value={mealDrinks} onChange={e => setMealDrinks(e.target.value)} placeholder="Boissons" className="w-full border rounded-xl px-3 py-2" />
-                        <input type="url" value={mealRecipeLink} onChange={e => setMealRecipeLink(e.target.value)} placeholder="Lien Recette (Web)" className="w-full border rounded-xl px-3 py-2 text-indigo-600" />
+                        <input type="url" value={mealRecipeLink} onChange={e => setMealRecipeLink(e.target.value)} placeholder="Lien Recette (Web)" className="w-full border rounded-xl px-3 py-2 text-primary-600" />
                         
                         <div>
                           <label className="text-xs font-bold text-gray-500 block mb-1">Ingrédients</label>
@@ -1252,10 +1274,10 @@ export default function TripPage() {
                               <button type="button" onClick={() => setMealIngredients(mealIngredients.filter((_, i) => i !== idx))} className="text-red-400 p-2"><Trash2 size={16}/></button>
                             </div>
                           ))}
-                          <button type="button" onClick={() => setMealIngredients([...mealIngredients, {name:'', qty:''}])} className="text-indigo-600 text-xs font-bold flex items-center gap-1"><Plus size={12}/> Ajouter un ingrédient</button>
+                          <button type="button" onClick={() => setMealIngredients([...mealIngredients, {name:'', qty:''}])} className="text-primary-600 text-xs font-bold flex items-center gap-1"><Plus size={12}/> Ajouter un ingrédient</button>
                         </div>
                       </div>
-                      <div className="p-5 border-t"><button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider le repas entier</button></div>
+                      <div className="p-5 border-t"><button type="submit" className="w-full bg-primary-600 text-white py-2.5 rounded-xl font-bold">Valider le repas entier</button></div>
                     </form>
                   </div>
                 </div>
@@ -1268,13 +1290,13 @@ export default function TripPage() {
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="w-full lg:w-1/3 space-y-6">
                 <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm sticky top-6">
-                  <h3 className="font-bold text-lg mb-4 flex gap-2"><PieChart size={18} className="text-indigo-600"/> Soldes</h3>
+                  <h3 className="font-bold text-lg mb-4 flex gap-2"><PieChart size={18} className="text-primary-600"/> Soldes</h3>
                   <div className="space-y-2">
                     {allKnownMembers.map(m => {
                       const b = balances[m.id] || 0;
                       return (
                         <div key={m.id} className="flex justify-between items-center p-2 rounded hover:bg-gray-50">
-                          <div className="flex gap-2 items-center"><div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs">{m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover rounded-full" /> : m.avatar}</div> <span className="text-sm font-semibold">{m.name}</span></div>
+                          <div className="flex gap-2 items-center"><div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs">{m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover rounded-full" /> : m.avatar}</div> <span className="text-sm font-semibold">{m.name}</span></div>
                           <span className={`font-bold text-sm ${b > 0.01 ? 'text-green-600' : b < -0.01 ? 'text-red-600' : 'text-gray-400'}`}>{b > 0 ? '+' : ''}{b.toFixed(2)} €</span>
                         </div>
                       )
@@ -1288,7 +1310,7 @@ export default function TripPage() {
                         <div key={idx} className="flex flex-col gap-2 mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                           <div className="flex justify-between items-center text-sm">
                             <span>{getMember(r.from)?.name} <ArrowRight size={12} className="inline mx-1"/> {getMember(r.to)?.name}</span>
-                            <span className="font-bold text-indigo-600">{r.amount.toFixed(2)} €</span>
+                            <span className="font-bold text-primary-600">{r.amount.toFixed(2)} €</span>
                           </div>
                           <button onClick={() => handleSettleDebt(r.from, r.to, r.amount)} className="w-full bg-green-100 text-green-700 hover:bg-green-200 py-1.5 rounded-lg font-bold transition-colors shadow-sm flex items-center justify-center gap-2 text-xs"><Check size={14} /> Marquer comme remboursé</button>
                         </div>
@@ -1299,7 +1321,7 @@ export default function TripPage() {
               </div>
 
               <div className="flex-1 space-y-4">
-                <div className="flex justify-between items-center"><h2 className="text-2xl font-bold">Dépenses</h2><button onClick={() => { resetExpenseForm(); setShowExpenseForm(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Ajouter</button></div>
+                <div className="flex justify-between items-center"><h2 className="text-2xl font-bold">Dépenses</h2><button onClick={() => { resetExpenseForm(); setShowExpenseForm(true); }} className="bg-primary-600 text-white px-4 py-2 rounded-xl text-sm"><Plus size={18} className="inline"/> Ajouter</button></div>
                 {expenses.length === 0 ? <div className="text-center p-8 bg-white rounded-xl border text-gray-400">Aucune dépense.</div> : (
                   expenses.map(exp => (
                     <div key={exp.id} className="bg-white p-4 rounded-xl border shadow-sm flex justify-between relative group">
@@ -1308,7 +1330,7 @@ export default function TripPage() {
                         <h3 className="font-bold">{exp.title}</h3>
                         <p className="text-xs text-gray-500 mt-1">Par {getMember(exp.paidBy)?.name} • Divisé en {exp.splitAmong.length}</p>
                       </div>
-                      <div className="text-lg font-black text-indigo-600">{exp.amount.toFixed(2)} €</div>
+                      <div className="text-lg font-black text-primary-600">{exp.amount.toFixed(2)} €</div>
                     </div>
                   ))
                 )}
@@ -1328,15 +1350,15 @@ export default function TripPage() {
                       </select>
                     </div>
                     <div>
-                      <div className="flex justify-between text-xs font-bold text-gray-500 mb-1"><label>Pour qui ?</label><button onClick={() => setExpenseSplitAmong(expenseSplitAmong.length === allKnownMembers.length ? [] : allKnownMembers.map(m => m.id))} className="text-indigo-600">Tout cocher</button></div>
+                      <div className="flex justify-between text-xs font-bold text-gray-500 mb-1"><label>Pour qui ?</label><button onClick={() => setExpenseSplitAmong(expenseSplitAmong.length === allKnownMembers.length ? [] : allKnownMembers.map(m => m.id))} className="text-primary-600">Tout cocher</button></div>
                       <div className="flex flex-wrap gap-2">
                         {allKnownMembers.map(m => {
                           const isInc = expenseSplitAmong.includes(m.id);
-                          return <button key={m.id} onClick={() => setExpenseSplitAmong(isInc ? expenseSplitAmong.filter(id => id !== m.id) : [...expenseSplitAmong, m.id])} className={`px-2 py-1 rounded border text-xs font-medium ${isInc ? 'bg-indigo-600 text-white' : 'bg-gray-50'}`}>{m.name}</button>
+                          return <button key={m.id} onClick={() => setExpenseSplitAmong(isInc ? expenseSplitAmong.filter(id => id !== m.id) : [...expenseSplitAmong, m.id])} className={`px-2 py-1 rounded border text-xs font-medium ${isInc ? 'bg-primary-600 text-white' : 'bg-gray-50'}`}>{m.name}</button>
                         })}
                       </div>
                     </div>
-                    <button onClick={handleSaveExpense} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider</button>
+                    <button onClick={handleSaveExpense} className="w-full bg-primary-600 text-white py-2.5 rounded-xl font-bold">Valider</button>
                   </div>
                 </div>
               )}
@@ -1350,10 +1372,10 @@ export default function TripPage() {
                 <h2 className="text-2xl font-bold text-gray-800">Souvenirs 📸</h2>
                 <div className="flex items-center gap-3">
                   <div className="flex bg-gray-100 p-1 rounded-lg">
-                    <button onClick={() => setGallerySortMode('date')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'date' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Récents</button>
-                    <button onClick={() => setGallerySortMode('moment')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'moment' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}>Par moment</button>
+                    <button onClick={() => setGallerySortMode('date')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'date' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Récents</button>
+                    <button onClick={() => setGallerySortMode('moment')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'moment' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Par moment</button>
                   </div>
-                  <button onClick={() => setShowMediaUploadModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-indigo-700 shadow-sm"><Plus size={18} /> Ajouter</button>
+                  <button onClick={() => setShowMediaUploadModal(true)} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-primary-700 shadow-sm"><Plus size={18} /> Ajouter</button>
                 </div>
               </div>
               
@@ -1384,7 +1406,7 @@ export default function TripPage() {
                       )}
                       
                       <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10">
-                        <button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-indigo-600"><Pencil size={14} /></button>
+                        <button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-primary-600"><Pencil size={14} /></button>
                         <button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button>
                       </div>                        
                     </div>
@@ -1403,7 +1425,7 @@ export default function TripPage() {
                   <button onClick={closeMediaUploadModal} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
                 </div>
                 
-                <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelectionForBulk} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 mb-4 shrink-0"/>
+                <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelectionForBulk} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mb-4 shrink-0"/>
                 
                 <div className="overflow-y-auto space-y-3 mb-4 flex-1 pr-2">
                   {pendingMediaItems.map(item => (
@@ -1422,7 +1444,7 @@ export default function TripPage() {
                   ))}
                 </div>
 
-                <button onClick={handleBulkMediaUpload} disabled={isUploading || pendingMediaItems.length === 0} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold shrink-0 shadow-md disabled:opacity-50 transition-all">{isUploading ? 'Envoi en cours...' : 'Envoyer les fichiers'}</button>
+                <button onClick={handleBulkMediaUpload} disabled={isUploading || pendingMediaItems.length === 0} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold shrink-0 shadow-md disabled:opacity-50 transition-all">{isUploading ? 'Envoi en cours...' : 'Envoyer les fichiers'}</button>
               </div>
             </div>
           )}
@@ -1434,14 +1456,14 @@ export default function TripPage() {
                   <h3 className="font-bold text-gray-800">Classer ce souvenir</h3>
                   <button onClick={() => setEditingMedia(null)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
                 </div>
-                <select value={editMediaDay} onChange={e => setEditMediaDay(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <select value={editMediaDay} onChange={e => setEditMediaDay(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
                   <option value="">Aucun jour défini</option>{WEEK_DAYS.map(d => <option key={d}>{d}</option>)}
                 </select>
-                <select value={editMediaSlot} onChange={e => setEditMediaSlot(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <select value={editMediaSlot} onChange={e => setEditMediaSlot(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
                   <option value="">Aucun moment défini</option>
                   {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].map(s => <option key={s}>{s}</option>)}
                 </select>
-                <button onClick={handleSaveMediaEdit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-colors">Enregistrer</button>
+                <button onClick={handleSaveMediaEdit} className="w-full bg-primary-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-primary-700 transition-colors">Enregistrer</button>
               </div>
             </div>
           )}
@@ -1470,11 +1492,11 @@ export default function TripPage() {
               {members.map(m => (
                 <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-indigo-200">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-primary-200">
                       {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-gray-800">{m.name} {m.id === currentUser?.id && <span className="text-indigo-500">(Moi)</span>}</div>
+                      <div className="text-sm font-bold text-gray-800">{m.name} {m.id === currentUser?.id && <span className="text-primary-500">(Moi)</span>}</div>
                       <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{m.role}</div>
                     </div>
                   </div>
@@ -1492,23 +1514,23 @@ export default function TripPage() {
 
       {/* NAV MOBILE */}
       <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
+        <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'destination' ? 'text-primary-600 font-bold' : 'text-gray-400'}`}>
           <div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div>
           <span className="text-[10px] mt-1">Lieu</span>
         </button>
-        <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'calendar' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+        <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'calendar' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <CalendarDays size={20} /><span className="text-[10px] mt-1">Planning</span>
         </button>
-        <button onClick={(e) => checkLock('activities', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'activities' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+        <button onClick={(e) => checkLock('activities', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'activities' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <Compass size={20} /><span className="text-[10px] mt-1">Activités</span>
         </button>
-        <button onClick={(e) => checkLock('meals', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'meals' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+        <button onClick={(e) => checkLock('meals', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'meals' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <Utensils size={20} /><span className="text-[10px] mt-1">Repas</span>
         </button>
-        <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'expenses' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+        <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'expenses' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <PieChart size={20} /><span className="text-[10px] mt-1">Comptes</span>
         </button>
-        <button onClick={(e) => checkLock('gallery', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'gallery' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+        <button onClick={(e) => checkLock('gallery', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'gallery' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <Camera size={20} /><span className="text-[10px] mt-1">Galerie</span>
         </button>
       </nav>
