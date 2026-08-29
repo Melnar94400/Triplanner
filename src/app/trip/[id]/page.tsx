@@ -347,13 +347,20 @@ export default function TripPage() {
     setIsEditingTransport(false);
     fetchTripData();
   }
-  const handleAddEquipment = async (e: React.FormEvent) => {
+const handleAddEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEquipment.trim()) return;
-    await supabase.from('equipment_items').insert([{ trip_id: tripId, name: newEquipment.trim() }]);
+    if (!newEquipment.trim() || !currentUser) return;
+    
+    // On ajoute directement le currentUser.id comme assignee_id
+    await supabase.from('equipment_items').insert([{ 
+      trip_id: tripId, 
+      name: newEquipment.trim(),
+      assignee_id: currentUser.id 
+    }]);
+    
     setNewEquipment(''); fetchTripData();
   }
-  const toggleEquipmentAssign = async (eq: Equipment) => {
+      const toggleEquipmentAssign = async (eq: Equipment) => {
     const newAssignee = eq.assignee_id === currentUser.id ? null : currentUser.id;
     await supabase.from('equipment_items').update({ assignee_id: newAssignee }).eq('id', eq.id);
     fetchTripData();
