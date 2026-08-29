@@ -30,9 +30,9 @@ const SLOT_ORDER: Record<string, number> = { 'Matin': 1, 'Déjeuner': 2, 'Après
 
 // --- CATÉGORIES POUR LA LISTE DE COURSES ---
 const SHOPPING_CATEGORIES = ['Fruits & Légumes', 'Viandes & Poissons', 'Frais & Laitier', 'Épicerie', 'Boissons', 'Divers'];
-const guessCategory = (name: string, customDict: Record<string, string> = {}) => {
+const guessCategory = (name: string, globalDict: Record<string, string> = {}) => {
   const key = name.toLowerCase().trim();
-  if (customDict[key]) return customDict[key]; // Priorité au dictionnaire de l'utilisateur
+  if (globalDict[key]) return globalDict[key]; // Priorité au dictionnaire global participatif
 
   if (key.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
   if (key.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
@@ -57,7 +57,7 @@ export default function TripPage() {
   const [weather, setWeather] = useState<any[] | null>(null)
   const [showMembersModal, setShowMembersModal] = useState(false);
 
-  // BASE DE DONNÉES GLOBALE DE L'UTILISATEUR
+  // BASE DE DONNÉES GLOBALE (Partagée par tous les utilisateurs)
   const [globalDictionary, setGlobalDictionary] = useState<Record<string, string>>({})
 
   // Destination States
@@ -114,7 +114,7 @@ export default function TripPage() {
   const [newExtraItem, setNewExtraItem] = useState('')
   const [newExtraQty, setNewExtraQty] = useState('')
   
-  // Auto-complétion globale (Mix entre le dico global et les repas actuels)
+  // Auto-complétion globale (Tous les ingrédients du dictionnaire global)
   const allIngredients = Array.from(new Set([
     ...Object.keys(globalDictionary).map(k => k.charAt(0).toUpperCase() + k.slice(1)), 
     ...meals.flatMap(m => m.ingredients?.map((i: any) => i.name) || [])
@@ -177,6 +177,7 @@ export default function TripPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'media' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_food_dictionary' }, () => { fetchTripData() }) // Réagit si qqun d'autre modifie le dico
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [tripId])
@@ -206,10 +207,12 @@ export default function TripPage() {
       if (!session) { router.push('/login'); return; }
       setCurrentUser(session.user)
 
-      // Chargement du profil et du dictionnaire global
-      const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-      if (myProfile) {
-        setGlobalDictionary(myProfile.food_dictionary || {})
+      // Chargement du dictionnaire global public
+      const { data: dictData } = await supabase.from('global_food_dictionary').select('*')
+      if (dictData) {
+        const dict: Record<string, string> = {}
+        dictData.forEach((d: any) => dict[d.name] = d.category)
+        setGlobalDictionary(dict)
       }
 
       const { data: tripData, error: tripError } = await supabase.from('trips').select('*').eq('id', tripId).single()
@@ -239,6 +242,7 @@ export default function TripPage() {
 
       if (!isUserInTrip) {
         await supabase.from('trip_members').insert({ trip_id: tripId, user_id: session.user.id, role: 'admin' })
+        const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         if (myProfile) loadedMembers.push({ id: myProfile.id, name: myProfile.name, avatar: myProfile.avatar || '👤', role: 'admin' })
       }
       setMembers(loadedMembers)
@@ -266,24 +270,24 @@ export default function TripPage() {
     } catch (err: any) { setError(err.message) } finally { setLoading(false) }
   }
 
-  // --- APPRENTISSAGE SILENCIEUX DES INGRÉDIENTS ---
+  // --- APPRENTISSAGE SILENCIEUX DES INGRÉDIENTS (Base de données globale) ---
   const learnNewIngredients = async (items: string[]) => {
-    if (!currentUser) return;
-    let dictUpdated = false;
+    let toUpsert: {name: string, category: string}[] = [];
     const newDict = { ...globalDictionary };
     
     items.forEach(item => {
       if (!item) return;
       const key = item.toLowerCase().trim();
       if (key && !newDict[key]) {
-        newDict[key] = guessCategory(key, newDict);
-        dictUpdated = true;
+        const cat = guessCategory(key, newDict);
+        newDict[key] = cat;
+        toUpsert.push({ name: key, category: cat });
       }
     });
 
-    if (dictUpdated) {
+    if (toUpsert.length > 0) {
       setGlobalDictionary(newDict);
-      await supabase.from('profiles').update({ food_dictionary: newDict }).eq('id', currentUser.id);
+      await supabase.from('global_food_dictionary').upsert(toUpsert);
     }
   };
 
@@ -450,7 +454,7 @@ export default function TripPage() {
     const cooks = mealCooks.map(id => ({ meal_id: currentMealId, user_id: id })); 
     if (cooks.length > 0) await supabase.from('meal_cooks').insert(cooks); 
     
-    // Apprentissage silencieux des ingrédients
+    // Apprentissage silencieux dans la BDD Globale
     learnNewIngredients(ings.map(i => i.name));
 
     fetchTripData(); resetMealForm(); 
@@ -468,7 +472,7 @@ export default function TripPage() {
   };
   const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
   
-  // Changer manuellement une catégorie
+  // Changer manuellement une catégorie (Mise à jour dans la base Globale !)
   const handleChangeCategory = async (itemId: string, newCategory: string) => {
     const item = shoppingList.find(i => i.id === itemId);
     if (!item) return;
@@ -478,8 +482,8 @@ export default function TripPage() {
     
     // MAJ Optimiste
     setGlobalDictionary(newDict);
-    // Sauvegarde globale dans le profil
-    await supabase.from('profiles').update({ food_dictionary: newDict }).eq('id', currentUser?.id);
+    // Sauvegarde dans la table partagée
+    await supabase.from('global_food_dictionary').upsert({ name: key, category: newCategory });
   };
 
   const shoppingList = React.useMemo(() => {
@@ -1184,7 +1188,7 @@ export default function TripPage() {
                                       {item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}
                                     </span>
                                     
-                                    {/* --- NOUVEAU MENU DÉROULANT POUR MODIFIER LA CATÉGORIE --- */}
+                                    {/* --- NOUVEAU MENU DÉROULANT POUR MODIFIER LA CATÉGORIE GLOBALE --- */}
                                     <div className="flex items-center gap-2 shrink-0">
                                       <select 
                                         value={item.category}
