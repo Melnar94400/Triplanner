@@ -648,11 +648,21 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
       </aside>
 
       <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-        <div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
-          <div><button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1"><ChevronLeft size={12} /> Retour</button><h1 className="font-black text-indigo-600 text-lg truncate max-w-[200px]">{trip.name}</h1></div>
-          <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Users size={16} /></button>
-        </div>       
-<div className="flex gap-2">
+<div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
+          <div>
+            <button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1">
+              <ChevronLeft size={12} /> Retour
+            </button>
+            <h1 className="font-black text-indigo-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
+          </div>
+          <button 
+            onClick={() => setShowMembersModal(true)} 
+            className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"
+          >
+            <Users size={18} />
+          </button>
+        </div>
+        <div className="flex gap-2">
   <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"><Users size={16} /></button>
   <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"><Users size={16} /></button>
 </div>
@@ -1373,14 +1383,28 @@ proposedPlaces.map(p => {
   </div>
 )}
 
-      <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-3 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}><div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div><span className="text-[10px] mt-1">Destination</span></button>
-        <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'calendar' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><CalendarDays size={20} /><span className="text-[10px] mt-1">Planning</span></button>
-        <button onClick={(e) => checkLock('activities', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'activities' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><Compass size={20} /><span className="text-[10px] mt-1">Activités</span></button>
-        <button onClick={(e) => checkLock('meals', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'meals' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><Utensils size={20} /><span className="text-[10px] mt-1">Repas</span></button>
-        <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-2 rounded-xl ${activeTab === 'expenses' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}><PieChart size={20} /><span className="text-[10px] mt-1">Comptes</span></button>
+<nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
+          <div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div>
+          <span className="text-[10px] mt-1">Lieu</span>
+        </button>
+        <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'calendar' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+          <CalendarDays size={20} /><span className="text-[10px] mt-1">Planning</span>
+        </button>
+        <button onClick={(e) => checkLock('activities', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'activities' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+          <Compass size={20} /><span className="text-[10px] mt-1">Activités</span>
+        </button>
+        <button onClick={(e) => checkLock('meals', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'meals' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+          <Utensils size={20} /><span className="text-[10px] mt-1">Repas</span>
+        </button>
+        <button onClick={(e) => checkLock('expenses', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'expenses' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+          <PieChart size={20} /><span className="text-[10px] mt-1">Comptes</span>
+        </button>
+        <button onClick={(e) => checkLock('gallery', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'gallery' ? 'text-indigo-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
+          <Camera size={20} /><span className="text-[10px] mt-1">Galerie</span>
+        </button>
       </nav>
-    </div>
+          </div>
     
   )
 
