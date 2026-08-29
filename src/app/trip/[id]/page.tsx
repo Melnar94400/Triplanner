@@ -30,9 +30,9 @@ const SLOT_ORDER: Record<string, number> = { 'Matin': 1, 'Déjeuner': 2, 'Après
 
 // --- CATÉGORIES POUR LA LISTE DE COURSES ---
 const SHOPPING_CATEGORIES = ['Fruits & Légumes', 'Viandes & Poissons', 'Frais & Laitier', 'Épicerie', 'Boissons', 'Divers'];
-const guessCategory = (name: string, customCategories: any = {}) => {
+const guessCategory = (name: string, customDict: Record<string, string> = {}) => {
   const key = name.toLowerCase().trim();
-  if (customCategories && customCategories[key]) return customCategories[key]; // Priorité au choix de l'utilisateur
+  if (customDict[key]) return customDict[key]; // Priorité au dictionnaire de l'utilisateur
 
   if (key.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
   if (key.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
@@ -56,6 +56,9 @@ export default function TripPage() {
   const [settlements, setSettlements] = useState<any[]>([])
   const [weather, setWeather] = useState<any[] | null>(null)
   const [showMembersModal, setShowMembersModal] = useState(false);
+
+  // BASE DE DONNÉES GLOBALE DE L'UTILISATEUR
+  const [globalDictionary, setGlobalDictionary] = useState<Record<string, string>>({})
 
   // Destination States
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
@@ -111,8 +114,11 @@ export default function TripPage() {
   const [newExtraItem, setNewExtraItem] = useState('')
   const [newExtraQty, setNewExtraQty] = useState('')
   
-  // Datalist extraction
-  const allIngredients = Array.from(new Set(meals.flatMap(m => m.ingredients?.map((i: any) => i.name) || []))).sort();
+  // Auto-complétion globale (Mix entre le dico global et les repas actuels)
+  const allIngredients = Array.from(new Set([
+    ...Object.keys(globalDictionary).map(k => k.charAt(0).toUpperCase() + k.slice(1)), 
+    ...meals.flatMap(m => m.ingredients?.map((i: any) => i.name) || [])
+  ])).filter(Boolean).sort();
 
   // Activities States
   const [activities, setActivities] = useState<Activity[]>([])
@@ -200,6 +206,12 @@ export default function TripPage() {
       if (!session) { router.push('/login'); return; }
       setCurrentUser(session.user)
 
+      // Chargement du profil et du dictionnaire global
+      const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+      if (myProfile) {
+        setGlobalDictionary(myProfile.food_dictionary || {})
+      }
+
       const { data: tripData, error: tripError } = await supabase.from('trips').select('*').eq('id', tripId).single()
       if (tripError) throw tripError
       setTrip(tripData)
@@ -227,7 +239,6 @@ export default function TripPage() {
 
       if (!isUserInTrip) {
         await supabase.from('trip_members').insert({ trip_id: tripId, user_id: session.user.id, role: 'admin' })
-        const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         if (myProfile) loadedMembers.push({ id: myProfile.id, name: myProfile.name, avatar: myProfile.avatar || '👤', role: 'admin' })
       }
       setMembers(loadedMembers)
@@ -254,6 +265,27 @@ export default function TripPage() {
       
     } catch (err: any) { setError(err.message) } finally { setLoading(false) }
   }
+
+  // --- APPRENTISSAGE SILENCIEUX DES INGRÉDIENTS ---
+  const learnNewIngredients = async (items: string[]) => {
+    if (!currentUser) return;
+    let dictUpdated = false;
+    const newDict = { ...globalDictionary };
+    
+    items.forEach(item => {
+      if (!item) return;
+      const key = item.toLowerCase().trim();
+      if (key && !newDict[key]) {
+        newDict[key] = guessCategory(key, newDict);
+        dictUpdated = true;
+      }
+    });
+
+    if (dictUpdated) {
+      setGlobalDictionary(newDict);
+      await supabase.from('profiles').update({ food_dictionary: newDict }).eq('id', currentUser.id);
+    }
+  };
 
   // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
   const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin'
@@ -417,47 +449,57 @@ export default function TripPage() {
     if (ings.length > 0) await supabase.from('meal_ingredients').insert(ings); 
     const cooks = mealCooks.map(id => ({ meal_id: currentMealId, user_id: id })); 
     if (cooks.length > 0) await supabase.from('meal_cooks').insert(cooks); 
+    
+    // Apprentissage silencieux des ingrédients
+    learnNewIngredients(ings.map(i => i.name));
+
     fetchTripData(); resetMealForm(); 
   }
   const handleDeleteMeal = async (id: string | number) => { await supabase.from('meals').delete().eq('id', id); fetchTripData(); }
 
-  const handleAddExtraItem = async (e: React.FormEvent) => { e.preventDefault(); if (!newExtraItem.trim()) return; await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); };
+  const handleAddExtraItem = async (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    if (!newExtraItem.trim()) return; 
+    
+    await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); 
+    learnNewIngredients([newExtraItem.trim()]); // Apprentissage silencieux
+
+    setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); 
+  };
   const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
   
-  // Fonction appelée quand l'utilisateur change la catégorie via le menu déroulant
+  // Changer manuellement une catégorie
   const handleChangeCategory = async (itemId: string, newCategory: string) => {
     const item = shoppingList.find(i => i.id === itemId);
     if (!item) return;
     
     const key = item.name.toLowerCase().trim();
-    const newCustomCategories = { ...(trip?.custom_categories || {}), [key]: newCategory };
+    const newDict = { ...globalDictionary, [key]: newCategory };
     
-    // Mise à jour optimiste pour que l'interface réagisse immédiatement
-    setTrip((prev: any) => ({ ...prev, custom_categories: newCustomCategories }));
-    
-    // Sauvegarde en base
-    await supabase.from('trips').update({ custom_categories: newCustomCategories }).eq('id', tripId);
+    // MAJ Optimiste
+    setGlobalDictionary(newDict);
+    // Sauvegarde globale dans le profil
+    await supabase.from('profiles').update({ food_dictionary: newDict }).eq('id', currentUser?.id);
   };
 
   const shoppingList = React.useMemo(() => {
     const list: Record<string, any> = {}
-    const customMapping = trip?.custom_categories || {};
 
     meals.forEach(meal => {
       meal.ingredients?.forEach(ing => {
         if (!ing.name) return
         const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-gray-100 text-gray-700';
-        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name, customMapping) }
+        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name, globalDictionary) }
         else { if (ing.qty && !list[key].qtys.includes(ing.qty)) list[key].qtys.push(ing.qty); if (!list[key].tags.some((t: any) => t.text === tagText)) list[key].tags.push({ text: tagText, color: tagColor }) }
       })
     })
     extraItems.forEach(item => {
       const key = item.name.toLowerCase().trim();
-      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name, customMapping) }
+      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name, globalDictionary) }
       else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-gray-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
     });
     return Object.values(list).map(item => ({ ...item, displayQty: item.qtys.join(' + ') }))
-  }, [meals, extraItems, trip?.custom_categories])
+  }, [meals, extraItems, globalDictionary])
 
   const toggleCheck = (id: string) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -679,7 +721,7 @@ export default function TripPage() {
           </button>
         </div>
         
-        {/* === INJECTION DE LA DATALIST === */}
+        {/* === INJECTION DE LA DATALIST GLOBALE === */}
         <datalist id="ingredients-list">
           {allIngredients.map((ing, idx) => <option key={idx} value={ing} />)}
         </datalist>
