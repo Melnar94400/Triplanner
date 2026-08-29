@@ -1,61 +1,62 @@
 @import "tailwindcss";
 
-:root {
-  /* Thème Violet (indigo par défaut) */
-  --primary-50: 238 242 255;
-  --primary-100: 224 231 255;
-  --primary-200: 199 210 254;
-  --primary-300: 165 180 252;
-  --primary-400: 129 140 248;
-  --primary-500: 99 102 241;
-  --primary-600: 79 70 229;
-  --primary-700: 67 56 202;
-  --primary-800: 55 48 163;
-  --primary-900: 49 46 129;
+/* 1. ON DÉFINIT LE THÈME PAR DÉFAUT (VIOLET) */
+@theme {
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
 }
 
-[data-theme='green'] {
-  /* Thème Vert Sauge (emerald) */
-  --primary-50: 236 253 245;
-  --primary-100: 209 250 229;
-  --primary-200: 167 243 208;
-  --primary-300: 110 231 183;
-  --primary-400: 52 211 153;
-  --primary-500: 16 185 129;
-  --primary-600: 5 150 105;
-  --primary-700: 4 120 87;
-  --primary-800: 6 95 70;
-  --primary-900: 6 78 59;
+/* 2. ON SURCHARGE LES COULEURS SELON LE THEME CHOISI */
+@layer base {
+  html[data-theme='green'] {
+    --color-primary-50: #ecfdf5;
+    --color-primary-100: #d1fae5;
+    --color-primary-200: #a7f3d0;
+    --color-primary-300: #6ee7b7;
+    --color-primary-400: #34d399;
+    --color-primary-500: #10b981;
+    --color-primary-600: #059669;
+    --color-primary-700: #047857;
+    --color-primary-800: #065f46;
+    --color-primary-900: #064e3b;
+  }
+
+  html[data-theme='neutral'] {
+    --color-primary-50: #f8fafc;
+    --color-primary-100: #f1f5f9;
+    --color-primary-200: #e2e8f0;
+    --color-primary-300: #cbd5e1;
+    --color-primary-400: #94a3b8;
+    --color-primary-500: #64748b;
+    --color-primary-600: #475569;
+    --color-primary-700: #334155;
+    --color-primary-800: #1e293b;
+    --color-primary-900: #0f172a;
+  }
+
+  html[data-theme='rose'] {
+    --color-primary-50: #fff1f2;
+    --color-primary-100: #ffe4e6;
+    --color-primary-200: #fecdd3;
+    --color-primary-300: #fda4af;
+    --color-primary-400: #fb7185;
+    --color-primary-500: #f43f5e;
+    --color-primary-600: #e11d48;
+    --color-primary-700: #be123c;
+    --color-primary-800: #9f1239;
+    --color-primary-900: #881337;
+  }
 }
 
-[data-theme='neutral'] {
-  /* Thème "Blanc/Gris perle" (slate) */
-  --primary-50: 248 250 252;
-  --primary-100: 241 245 249;
-  --primary-200: 226 232 240;
-  --primary-300: 203 213 225;
-  --primary-400: 148 163 184;
-  --primary-500: 100 116 139;
-  --primary-600: 71 85 105;
-  --primary-700: 51 65 85;
-  --primary-800: 30 41 59;
-  --primary-900: 15 23 42;
-}
-
-[data-theme='rose'] {
-  /* Thème Rose Pastel (rose) */
-  --primary-50: 255 241 242;
-  --primary-100: 255 228 230;
-  --primary-200: 254 205 211;
-  --primary-300: 253 164 175;
-  --primary-400: 251 113 133;
-  --primary-500: 244 63 94;
-  --primary-600: 225 29 72;
-  --primary-700: 190 18 60;
-  --primary-800: 159 18 57;
-  --primary-900: 136 19 55;
-}
-
+/* Paramètres de base de ton projet Next.js */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -77,6 +78,6 @@ body {
 }
 
 ::selection {
-  background-color: #ffedd5;
-  color: #9a3412;
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
 }
