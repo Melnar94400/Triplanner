@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import dynamic from 'next/dynamic'
+import JSZip from 'jszip'
 import {
   Calendar, MapPin, Users, Utensils, ShoppingBag, PieChart,
   Plus, Check, X, Pencil, Trash2, ArrowRight, Compass, Loader2, ChevronLeft,
   Star, ExternalLink, CalendarDays, Camera, ChevronRight, Play, Copy,
-  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target
+  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target, Train, Plane, Backpack, Download
 } from 'lucide-react'
 import EXIF from 'exif-js'
 
@@ -17,23 +18,23 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false })
 type Meal = { id: string | number; day: string; type: string; name: string; starter?: string; dessert?: string; drinks?: string; recipeLink?: string; cooks: string[]; ingredients: { name: string; qty: string }[]; };
 type Member = { id: string; name: string; avatar: string; role: string; };
 type ActivityVote = 'yes' | 'maybe' | 'no';
-type Activity = {
-  id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>;
-}
+type Activity = { id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>; }
 type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
 type PendingMedia = { id: string; file: File; preview: string; day: string; time_slot: string; };
+
+// Types Logistique
+type Transport = { id: string; user_id: string; mode: string; coming_from: string; arrival_time: string; seats_available: number; };
+type Equipment = { id: string; name: string; assignee_id: string | null; };
 
 const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi (Arrivée)': 'bg-orange-100 text-orange-700', 'Samedi (Départ)': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
 const WEEK_DAYS = ['Samedi (Arrivée)', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Départ)'];
 const DAY_ORDER: Record<string, number> = { 'Samedi (Arrivée)': 1, 'Dimanche': 2, 'Lundi': 3, 'Mardi': 4, 'Mercredi': 5, 'Jeudi': 6, 'Vendredi': 7, 'Samedi (Départ)': 8 };
 const SLOT_ORDER: Record<string, number> = { 'Matin': 1, 'Déjeuner': 2, 'Après-midi': 3, 'Dîner': 4, 'Soirée': 5 };
 
-// --- CATÉGORIES POUR LA LISTE DE COURSES ---
 const SHOPPING_CATEGORIES = ['Fruits & Légumes', 'Viandes & Poissons', 'Frais & Laitier', 'Épicerie', 'Boissons', 'Divers'];
 const guessCategory = (name: string, globalDict: Record<string, string> = {}) => {
   const key = name.toLowerCase().trim();
-  if (globalDict[key]) return globalDict[key]; // Priorité au dictionnaire global participatif
-
+  if (globalDict[key]) return globalDict[key]; 
   if (key.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
   if (key.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
   if (key.match(/lait|beurre|crème|fromage|oeuf|yaourt|mozzarella|feta|gruyère/)) return 'Frais & Laitier';
@@ -43,22 +44,6 @@ const guessCategory = (name: string, globalDict: Record<string, string> = {}) =>
 }
 
 export default function TripPage() {
-
-  // État du thème
-  const [appTheme, setAppTheme] = useState('violet')
-
-  useEffect(() => {
-    const saved = localStorage.getItem('trip-theme') || 'violet'
-    setAppTheme(saved)
-    document.documentElement.setAttribute('data-theme', saved)
-  }, [])
-
-  const changeTheme = (t: string) => {
-    setAppTheme(t)
-    localStorage.setItem('trip-theme', t)
-    document.documentElement.setAttribute('data-theme', t)
-  }
-
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
@@ -73,10 +58,10 @@ export default function TripPage() {
   const [weather, setWeather] = useState<any[] | null>(null)
   const [showMembersModal, setShowMembersModal] = useState(false);
 
-  // BASE DE DONNÉES GLOBALE (Partagée par tous les utilisateurs)
+  // Dico Global
   const [globalDictionary, setGlobalDictionary] = useState<Record<string, string>>({})
 
-  // Destination States
+  // Destination & Planning
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
   const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
@@ -87,14 +72,10 @@ export default function TripPage() {
 
   useEffect(() => {
     if (startDate && endDate) {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const startDay = start.getDate()
-      const endDay = end.getDate()
-      const startMonth = start.toLocaleDateString('fr-FR', { month: 'long' })
-      const endMonth = end.toLocaleDateString('fr-FR', { month: 'long' })
-      if (startMonth === endMonth) setNewWeek(`Du ${startDay} au ${endDay} ${startMonth}`)
-      else setNewWeek(`Du ${startDay} ${startMonth} au ${endDay} ${endMonth}`)
+      const start = new Date(startDate); const end = new Date(endDate);
+      const startMonth = start.toLocaleDateString('fr-FR', { month: 'long' }); const endMonth = end.toLocaleDateString('fr-FR', { month: 'long' });
+      if (startMonth === endMonth) setNewWeek(`Du ${start.getDate()} au ${end.getDate()} ${startMonth}`);
+      else setNewWeek(`Du ${start.getDate()} ${startMonth} au ${end.getDate()} ${endMonth}`);
     }
   }, [startDate, endDate])
 
@@ -104,13 +85,13 @@ export default function TripPage() {
   const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({ name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null as number|null, lng: null as number|null })  
 
-  // Lock States
+  // Locks
   const [lockWeek, setLockWeek] = useState('')
   const [lockRegion, setLockRegion] = useState('')
   const [lockPlaceId, setLockPlaceId] = useState('')
   const [isLocking, setIsLocking] = useState(false)
 
-  // Meals States
+  // Meals & Shopping
   const [meals, setMeals] = useState<Meal[]>([])
   const [checkedItems, setCheckedItems] = useState<{[key: string]: boolean}>({})
   const [showMealForm, setShowMealForm] = useState(false)
@@ -124,19 +105,16 @@ export default function TripPage() {
   const [mealRecipeLink, setMealRecipeLink] = useState('')
   const [mealCooks, setMealCooks] = useState<string[]>([])
   const [mealIngredients, setMealIngredients] = useState<{name: string, qty: string}[]>([])
-
-  // Extra Shopping
   const [extraItems, setExtraItems] = useState<{id: string, name: string, qty: string}[]>([])
   const [newExtraItem, setNewExtraItem] = useState('')
   const [newExtraQty, setNewExtraQty] = useState('')
   
-  // Auto-complétion globale (Tous les ingrédients du dictionnaire global)
   const allIngredients = Array.from(new Set([
     ...Object.keys(globalDictionary).map(k => k.charAt(0).toUpperCase() + k.slice(1)), 
     ...meals.flatMap(m => m.ingredients?.map((i: any) => i.name) || [])
   ])).filter(Boolean).sort();
 
-  // Activities States
+  // Activities
   const [activities, setActivities] = useState<Activity[]>([])
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [editingActivityId, setEditingActivityId] = useState<string | number | null>(null)
@@ -149,7 +127,7 @@ export default function TripPage() {
   const [actTimeSlot, setActTimeSlot] = useState('')
   const [isSavingAct, setIsSavingAct] = useState(false)
 
-  // Expenses States
+  // Expenses
   const [expenses, setExpenses] = useState<{ id: string | number; title: string; amount: number; paidBy: string; splitAmong: string[] }[]>([])
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [editingExpenseId, setEditingExpenseId] = useState<string | number | null>(null)
@@ -158,7 +136,14 @@ export default function TripPage() {
   const [expensePayer, setExpensePayer] = useState<string>('')
   const [expenseSplitAmong, setExpenseSplitAmong] = useState<string[]>([])
 
-  // Media States
+  // Transports & Equipment (LOGISTIQUE)
+  const [transports, setTransports] = useState<Transport[]>([])
+  const [myTransport, setMyTransport] = useState<Partial<Transport>>({ mode: 'Voiture', coming_from: '', arrival_time: '', seats_available: 0 })
+  const [isEditingTransport, setIsEditingTransport] = useState(false)
+  const [equipments, setEquipments] = useState<Equipment[]>([])
+  const [newEquipment, setNewEquipment] = useState('')
+
+  // Media
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [selectedSlotForMedia, setSelectedSlotForMedia] = useState<{day: string, slot: string} | null>(null)
@@ -168,6 +153,11 @@ export default function TripPage() {
   const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null)
   const [editMediaDay, setEditMediaDay] = useState('')
   const [editMediaSlot, setEditMediaSlot] = useState('')
+  
+  // Media Sélection / Download
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set())
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Lightbox
   const [viewerItems, setViewerItems] = useState<MediaItem[]>([])
@@ -193,7 +183,9 @@ export default function TripPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'media' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => { fetchTripData() })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_food_dictionary' }, () => { fetchTripData() }) // Réagit si qqun d'autre modifie le dico
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_transports' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipment_items' }, () => { fetchTripData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_food_dictionary' }, () => { fetchTripData() }) 
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [tripId])
@@ -223,7 +215,6 @@ export default function TripPage() {
       if (!session) { router.push('/login'); return; }
       setCurrentUser(session.user)
 
-      // Chargement du dictionnaire global public
       const { data: dictData } = await supabase.from('global_food_dictionary').select('*')
       if (dictData) {
         const dict: Record<string, string> = {}
@@ -283,14 +274,23 @@ export default function TripPage() {
       const { data: expensesData } = await supabase.from('expenses').select('*').eq('trip_id', tripId)
       if (expensesData) setExpenses(expensesData.map((e: any) => ({ id: e.id, title: e.title, amount: e.amount, paidBy: e.paid_by, splitAmong: e.split_among || [] })))
       
+      // LOGISTIQUE
+      const { data: tData } = await supabase.from('trip_transports').select('*').eq('trip_id', tripId)
+      if (tData) {
+        setTransports(tData)
+        const mine = tData.find((t:any) => t.user_id === session.user.id)
+        if (mine) setMyTransport({ mode: mine.mode, coming_from: mine.coming_from, arrival_time: mine.arrival_time, seats_available: mine.seats_available })
+      }
+
+      const { data: eData } = await supabase.from('equipment_items').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+      if (eData) setEquipments(eData)
+
     } catch (err: any) { setError(err.message) } finally { setLoading(false) }
   }
 
-  // --- APPRENTISSAGE SILENCIEUX DES INGRÉDIENTS (Base de données globale) ---
   const learnNewIngredients = async (items: string[]) => {
     let toUpsert: {name: string, category: string}[] = [];
     const newDict = { ...globalDictionary };
-    
     items.forEach(item => {
       if (!item) return;
       const key = item.toLowerCase().trim();
@@ -300,273 +300,144 @@ export default function TripPage() {
         toUpsert.push({ name: key, category: cat });
       }
     });
-
     if (toUpsert.length > 0) {
       setGlobalDictionary(newDict);
       await supabase.from('global_food_dictionary').upsert(toUpsert);
     }
   };
 
-  // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
   const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin'
   const isLocked = trip?.is_planning_locked
-  const handleRemoveMember = async (memberId: string) => {
-    if (!confirm("Voulez-vous vraiment retirer cette personne du voyage ?")) return;
-    try {
-      await supabase.from('trip_members').delete().eq('trip_id', tripId).eq('user_id', memberId);
-      fetchTripData();
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-  const handleSaveWeek = async (e?: React.FormEvent) => {
-    if(e) e.preventDefault();
-    if(!newWeek.trim()) return;
-    if (editingWeekId) {
-      await supabase.from('proposed_weeks').update({ week_text: newWeek }).eq('id', editingWeekId);
-      setEditingWeekId(null);
-    } else {
-      await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]);
-    }
-    setNewWeek(''); setStartDate(''); setEndDate(''); fetchTripData();
-  }
-
+  const handleRemoveMember = async (memberId: string) => { if (!confirm("Voulez-vous vraiment retirer cette personne du voyage ?")) return; try { await supabase.from('trip_members').delete().eq('trip_id', tripId).eq('user_id', memberId); fetchTripData(); } catch (err: any) { alert(err.message); } };
+  
+  const handleSaveWeek = async (e?: React.FormEvent) => { if(e) e.preventDefault(); if(!newWeek.trim()) return; if (editingWeekId) { await supabase.from('proposed_weeks').update({ week_text: newWeek }).eq('id', editingWeekId); setEditingWeekId(null); } else { await supabase.from('proposed_weeks').insert([{trip_id: tripId, week_text: newWeek, proposed_by: currentUser.id}]); } setNewWeek(''); setStartDate(''); setEndDate(''); fetchTripData(); }
   const startEditWeek = (w: any) => { setEditingWeekId(w.id); setNewWeek(w.text); setStartDate(''); setEndDate(''); }
   const handleDeleteWeek = async (id: string) => { if(confirm("Supprimer cette date ?")) { await supabase.from('proposed_weeks').delete().eq('id', id); fetchTripData(); } }
-  const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
-    if(!currentUser) return;
-    const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
-    setProposedWeeks(prev => prev.map(w => w.id === weekId ? {...w, votes: newVotes} : w));
-    await supabase.from('proposed_weeks').update({votes: newVotes}).eq('id', weekId);
-  }
+  const toggleWeekVote = async (weekId: string, currentVotes: string[]) => { if(!currentUser) return; const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id]; setProposedWeeks(prev => prev.map(w => w.id === weekId ? {...w, votes: newVotes} : w)); await supabase.from('proposed_weeks').update({votes: newVotes}).eq('id', weekId); }
 
-  const handleSaveRegion = async (e?: React.FormEvent) => {
-    if(e) e.preventDefault();
-    if(!newRegion.trim()) return;
-    if (editingRegionId) {
-      await supabase.from('proposed_regions').update({ name: newRegion }).eq('id', editingRegionId);
-      setEditingRegionId(null);
-    } else {
-      await supabase.from('proposed_regions').insert([{trip_id: tripId, name: newRegion, proposed_by: currentUser.id}]);
-    }
-    setNewRegion(''); fetchTripData();
-  }
+  const handleSaveRegion = async (e?: React.FormEvent) => { if(e) e.preventDefault(); if(!newRegion.trim()) return; if (editingRegionId) { await supabase.from('proposed_regions').update({ name: newRegion }).eq('id', editingRegionId); setEditingRegionId(null); } else { await supabase.from('proposed_regions').insert([{trip_id: tripId, name: newRegion, proposed_by: currentUser.id}]); } setNewRegion(''); fetchTripData(); }
   const startEditRegion = (r: any) => { setEditingRegionId(r.id); setNewRegion(r.name); }
   const handleDeleteRegion = async (id: string) => { if(confirm("Supprimer cette région ?")) { await supabase.from('proposed_regions').delete().eq('id', id); fetchTripData(); } }
-  
-  const handleRegionRating = async (regionId: string, currentRatings: any, score: number) => {
-    if(!currentUser) return;
-    const newRatings = {...currentRatings, [currentUser.id]: score};
-    setProposedRegions(prev => prev.map(r => r.id === regionId ? {...r, ratings: newRatings} : r));
-    await supabase.from('proposed_regions').update({ratings: newRatings}).eq('id', regionId);
-  }
+  const handleRegionRating = async (regionId: string, currentRatings: any, score: number) => { if(!currentUser) return; const newRatings = {...currentRatings, [currentUser.id]: score}; setProposedRegions(prev => prev.map(r => r.id === regionId ? {...r, ratings: newRatings} : r)); await supabase.from('proposed_regions').update({ratings: newRatings}).eq('id', regionId); }
 
   const handleSavePlace = async (e?: React.FormEvent) => {
-    if(e) e.preventDefault();
-    if(!placeData.name.trim() || !placeData.address.trim()) return alert("Nom et adresse requis.");
+    if(e) e.preventDefault(); if(!placeData.name.trim() || !placeData.address.trim()) return alert("Nom et adresse requis.");
     let lat = placeData.lat, lng = placeData.lng;
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeData.address)}`);
-      const geo = await res.json();
-      if(geo && geo.length > 0) { lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon); }
-    } catch(err) {}
-    
-    const payload = {
-      trip_id: tripId, name: placeData.name, address: placeData.address,
-      price: placeData.price ? Number(placeData.price) : null, beds: placeData.beds ? Number(placeData.beds) : null,
-      amenities: placeData.amenities, link: placeData.link, lat, lng
-    };
-
-    if (editingPlaceId) {
-      await supabase.from('proposed_places').update(payload).eq('id', editingPlaceId);
-    } else {
-      await supabase.from('proposed_places').insert([{ ...payload, proposed_by: currentUser.id }]);
-    }
+    try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeData.address)}`); const geo = await res.json(); if(geo && geo.length > 0) { lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon); } } catch(err) {}
+    const payload = { trip_id: tripId, name: placeData.name, address: placeData.address, price: placeData.price ? Number(placeData.price) : null, beds: placeData.beds ? Number(placeData.beds) : null, amenities: placeData.amenities, link: placeData.link, lat, lng };
+    if (editingPlaceId) { await supabase.from('proposed_places').update(payload).eq('id', editingPlaceId); } else { await supabase.from('proposed_places').insert([{ ...payload, proposed_by: currentUser.id }]); }
     setShowPlaceForm(false); setEditingPlaceId(null); setPlaceData({name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null, lng: null}); fetchTripData();
   }
-  
   const startEditPlace = (p: any) => { setEditingPlaceId(p.id); setPlaceData({ name: p.name, address: p.address, price: p.price || '', beds: p.beds || '', amenities: p.amenities || '', link: p.link || '', lat: p.lat, lng: p.lng }); setShowPlaceForm(true); }
   const handleDeletePlace = async (id: string) => { if(confirm("Supprimer ce gîte ?")) { await supabase.from('proposed_places').delete().eq('id', id); fetchTripData(); } }
-  
-  const togglePlaceVote = async (placeId: string, currentVotes: string[]) => {
-    if(!currentUser) return;
-    const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
-    setProposedPlaces(prev => prev.map(p => p.id === placeId ? {...p, votes: newVotes} : p));
-    await supabase.from('proposed_places').update({votes: newVotes}).eq('id', placeId);
-  }
+  const getRatingStats = (ratings: Record<string, number>) => { const scores = Object.values(ratings); if (scores.length === 0) return { avg: 0, sd: 0, consensus: 0 }; const avg = scores.reduce((a, b) => a + b, 0) / scores.length; const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length; const sd = Math.sqrt(variance); return { avg, sd, consensus: Math.max(0, avg - (sd * 0.8)) }; }
+  const handlePlaceRating = async (placeId: string, currentRatings: any, score: number) => { if(!currentUser) return; const newRatings = {...currentRatings, [currentUser.id]: score}; setProposedPlaces(prev => prev.map(p => p.id === placeId ? {...p, ratings: newRatings} : p)); await supabase.from('proposed_places').update({ratings: newRatings}).eq('id', placeId); }
 
-  const getRatingStats = (ratings: Record<string, number>) => { 
-    const scores = Object.values(ratings); 
-    if (scores.length === 0) return { avg: 0, sd: 0, consensus: 0 }; 
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length; 
-    const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / scores.length;
-    const sd = Math.sqrt(variance);
-    let consensus = avg - (sd * 0.8);
-    return { avg, sd, consensus: Math.max(0, consensus) }; 
-  }
+  const handleLockPhase1 = async () => { if (!lockWeek || !lockRegion) return alert("Sélectionnez la semaine et la région !"); setIsLocking(true); try { await supabase.from('trips').update({ trip_week: lockWeek, trip_region: lockRegion }).eq('id', tripId); await fetchTripData(); } catch(err:any) { alert(err.message); } finally { setIsLocking(false); } }
+  const handleUnlockPhase1 = async () => { if (!confirm("Revenir au vote de la région ? Les gîtes proposés seront conservés.")) return; await supabase.from('trips').update({ trip_week: null, trip_region: null }).eq('id', tripId); fetchTripData(); }
+  const handleLockPhase2 = async () => { const place = proposedPlaces.find(p => p.id === lockPlaceId); if (!place) return alert("Sélectionnez le gîte final."); setIsLocking(true); try { await supabase.from('trips').update({ accommodation_name: place.name, accommodation_address: place.address, accommodation_lat: place.lat, accommodation_lng: place.lng, is_planning_locked: true }).eq('id', tripId); await fetchTripData(); setActiveTab('calendar'); } catch(err:any) { alert(err.message); } finally { setIsLocking(false); } }
+  const handleUnlockTrip = async () => { if (!confirm("Déverrouiller le voyage ?")) return; await supabase.from('trips').update({ is_planning_locked: false }).eq('id', tripId); fetchTripData(); };
+  const checkLock = (tabName: string, e: React.MouseEvent) => { if (!isLocked) { e.preventDefault(); alert("Il faut d'abord sanctuariser la destination (Semaine, Région, Gîte)."); } else setActiveTab(tabName); };
 
-  const handlePlaceRating = async (placeId: string, currentRatings: any, score: number) => {
-    if(!currentUser) return;
-    const newRatings = {...currentRatings, [currentUser.id]: score};
-    setProposedPlaces(prev => prev.map(p => p.id === placeId ? {...p, ratings: newRatings} : p));
-    await supabase.from('proposed_places').update({ratings: newRatings}).eq('id', placeId);
-  }
-
-  const handleLockPhase1 = async () => {
-    if (!lockWeek || !lockRegion) return alert("Sélectionnez la semaine et la région !");
-    setIsLocking(true);
-    try {
-      await supabase.from('trips').update({ trip_week: lockWeek, trip_region: lockRegion }).eq('id', tripId);
-      await fetchTripData();
-    } catch(err:any) { alert(err.message); } finally { setIsLocking(false); }
-  }
-
-  const handleUnlockPhase1 = async () => {
-    if (!confirm("Revenir au vote de la région ? Les gîtes proposés seront conservés.")) return;
-    await supabase.from('trips').update({ trip_week: null, trip_region: null }).eq('id', tripId);
+  // Logistique Handlers
+  const handleSaveTransport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    await supabase.from('trip_transports').upsert({ trip_id: tripId, user_id: currentUser.id, ...myTransport }, { onConflict: 'trip_id, user_id' });
+    setIsEditingTransport(false);
     fetchTripData();
   }
-
-  const handleLockPhase2 = async () => {
-    const place = proposedPlaces.find(p => p.id === lockPlaceId);
-    if (!place) return alert("Sélectionnez le gîte final.");
-    setIsLocking(true);
-    try {
-      await supabase.from('trips').update({
-        accommodation_name: place.name, accommodation_address: place.address,
-        accommodation_lat: place.lat, accommodation_lng: place.lng, is_planning_locked: true
-      }).eq('id', tripId);
-      await fetchTripData(); setActiveTab('activities');
-    } catch(err:any) { alert(err.message); } finally { setIsLocking(false); }
+  const handleAddEquipment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEquipment.trim()) return;
+    await supabase.from('equipment_items').insert([{ trip_id: tripId, name: newEquipment.trim() }]);
+    setNewEquipment(''); fetchTripData();
   }
-  
-  const handleUnlockTrip = async () => {
-    if (!confirm("Déverrouiller le voyage ?")) return;
-    await supabase.from('trips').update({ is_planning_locked: false }).eq('id', tripId);
+  const toggleEquipmentAssign = async (eq: Equipment) => {
+    const newAssignee = eq.assignee_id === currentUser.id ? null : currentUser.id;
+    await supabase.from('equipment_items').update({ assignee_id: newAssignee }).eq('id', eq.id);
     fetchTripData();
-  };
-  
-  const checkLock = (tabName: string, e: React.MouseEvent) => {
-    if (!isLocked) { e.preventDefault(); alert("Il faut d'abord sanctuariser la destination (Semaine, Région, Gîte)."); } 
-    else setActiveTab(tabName);
-  };
+  }
+  const deleteEquipment = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await supabase.from('equipment_items').delete().eq('id', id); fetchTripData();
+  }
+  const getTransportIcon = (mode: string) => {
+    if (mode === 'Train') return <Train size={16} />;
+    if (mode === 'Avion') return <Plane size={16} />;
+    return <Car size={16} />;
+  }
 
-  // --- REPAS & COURSES ---
+  // Repas Handlers
   const resetMealForm = () => { setEditingMealId(null); setMealDay('Samedi (Arrivée)'); setMealType('Déjeuner'); setMealName(''); setMealStarter(''); setMealDessert(''); setMealDrinks(''); setMealRecipeLink(''); setMealCooks([]); setMealIngredients([{ name: '', qty: '' }]); setShowMealForm(false); };
   const editMeal = (meal: Meal) => { setEditingMealId(meal.id); setMealDay(meal.day); setMealType(meal.type); setMealName(meal.name || ''); setMealStarter(meal.starter || ''); setMealDessert(meal.dessert || ''); setMealDrinks(meal.drinks || ''); setMealRecipeLink(meal.recipeLink || ''); setMealCooks(meal.cooks || []); setMealIngredients(meal.ingredients?.length ? meal.ingredients : [{ name: '', qty: '' }]); setShowMealForm(true); };
-  
   const handleSaveMeal = async (e?: React.FormEvent) => { 
     if (e) e.preventDefault();
     if (!mealName.trim()) return; 
     const mealPayload = { trip_id: tripId, day: mealDay, type: mealType, name: mealName.trim(), starter: mealStarter.trim() || null, dessert: mealDessert.trim() || null, drinks: mealDrinks.trim() || null, recipe_link: mealRecipeLink.trim() || null }; 
     let currentMealId = editingMealId; 
-    if (editingMealId) { 
-      await supabase.from('meals').update(mealPayload).eq('id', editingMealId); await supabase.from('meal_ingredients').delete().eq('meal_id', editingMealId); await supabase.from('meal_cooks').delete().eq('meal_id', editingMealId); 
-    } else { 
-      const { data } = await supabase.from('meals').insert([mealPayload]).select().single(); currentMealId = data?.id; 
-    } 
+    if (editingMealId) { await supabase.from('meals').update(mealPayload).eq('id', editingMealId); await supabase.from('meal_ingredients').delete().eq('meal_id', editingMealId); await supabase.from('meal_cooks').delete().eq('meal_id', editingMealId); } 
+    else { const { data } = await supabase.from('meals').insert([mealPayload]).select().single(); currentMealId = data?.id; } 
     const ings = mealIngredients.filter(i => i.name.trim()).map(i => ({ meal_id: currentMealId, name: i.name.trim(), qty: i.qty.trim() || null })); 
     if (ings.length > 0) await supabase.from('meal_ingredients').insert(ings); 
     const cooks = mealCooks.map(id => ({ meal_id: currentMealId, user_id: id })); 
     if (cooks.length > 0) await supabase.from('meal_cooks').insert(cooks); 
-    
-    // Apprentissage silencieux dans la BDD Globale
     learnNewIngredients(ings.map(i => i.name));
-
     fetchTripData(); resetMealForm(); 
   }
   const handleDeleteMeal = async (id: string | number) => { await supabase.from('meals').delete().eq('id', id); fetchTripData(); }
 
-  const handleAddExtraItem = async (e: React.FormEvent) => { 
-    e.preventDefault(); 
-    if (!newExtraItem.trim()) return; 
-    
-    await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); 
-    learnNewIngredients([newExtraItem.trim()]); // Apprentissage silencieux
-
-    setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); 
-  };
+  const handleAddExtraItem = async (e: React.FormEvent) => { e.preventDefault(); if (!newExtraItem.trim()) return; await supabase.from('shopping_items').insert([{ trip_id: tripId, name: newExtraItem.trim(), qty: newExtraQty.trim() || null }]); learnNewIngredients([newExtraItem.trim()]); setNewExtraItem(''); setNewExtraQty(''); fetchTripData(); };
   const handleDeleteExtraItem = async (id: string, e: React.MouseEvent) => { e.stopPropagation(); await supabase.from('shopping_items').delete().eq('id', id); fetchTripData(); };
-  
-  // Changer manuellement une catégorie (Mise à jour dans la base Globale !)
   const handleChangeCategory = async (itemId: string, newCategory: string) => {
-    const item = shoppingList.find(i => i.id === itemId);
-    if (!item) return;
-    
+    const item = shoppingList.find(i => i.id === itemId); if (!item) return;
     const key = item.name.toLowerCase().trim();
     const newDict = { ...globalDictionary, [key]: newCategory };
-    
-    // MAJ Optimiste
     setGlobalDictionary(newDict);
-    // Sauvegarde dans la table partagée
     await supabase.from('global_food_dictionary').upsert({ name: key, category: newCategory });
   };
 
   const shoppingList = React.useMemo(() => {
     const list: Record<string, any> = {}
-
-    meals.forEach(meal => {
-      meal.ingredients?.forEach(ing => {
+    meals.forEach(meal => { meal.ingredients?.forEach(ing => {
         if (!ing.name) return
-        const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-primary-100 text-gray-700';
+        const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-gray-100 text-gray-700';
         if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name, globalDictionary) }
         else { if (ing.qty && !list[key].qtys.includes(ing.qty)) list[key].qtys.push(ing.qty); if (!list[key].tags.some((t: any) => t.text === tagText)) list[key].tags.push({ text: tagText, color: tagColor }) }
       })
     })
     extraItems.forEach(item => {
       const key = item.name.toLowerCase().trim();
-      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-primary-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name, globalDictionary) }
-      else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-primary-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
+      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name, globalDictionary) }
+      else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-gray-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
     });
     return Object.values(list).map(item => ({ ...item, displayQty: item.qtys.join(' + ') }))
   }, [meals, extraItems, globalDictionary])
-
   const toggleCheck = (id: string) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }))
 
-  // --- ACTIVITÉS ---
+  // Activities Handlers
   const resetActivityForm = () => { setEditingActivityId(null); setActTitle(''); setActDesc(''); setActPrice(''); setActLink(''); setActAddress(''); setActDay(''); setActTimeSlot(''); setShowActivityForm(false); }
   const editActivity = (act: Activity) => { setEditingActivityId(act.id); setActTitle(act.title); setActDesc(act.description); setActPrice(act.price); setActLink(act.link || ''); setActAddress(act.address || ''); setActDay(act.day || ''); setActTimeSlot(act.timeSlot || ''); setShowActivityForm(true); }
-  
-  const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefault();
-    if (!actTitle.trim() || !currentUser) return; setIsSavingAct(true);
+  const handleSaveActivity = async (e?: React.FormEvent) => { if (e) e.preventDefault(); if (!actTitle.trim() || !currentUser) return; setIsSavingAct(true);
     let lat = null, lng = null, durationStr = null;
-    if (actAddress.trim()) {
-      try {
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(actAddress)}`); const geo = await geoRes.json();
-        if (geo && geo.length > 0) {
-          lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon);
-          if (trip?.accommodation_lat && trip?.accommodation_lng) {
-            const osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${trip.accommodation_lng},${trip.accommodation_lat};${lng},${lat}?overview=false`); const osrmData = await osrmRes.json();
-            if (osrmData.routes && osrmData.routes.length > 0) {
-              const mins = Math.round(osrmData.routes[0].duration / 60);
-              if (mins < 60) durationStr = `${mins} min`; else { const h = Math.floor(mins / 60); const m = mins % 60; durationStr = `${h}h${m > 0 ? m.toString().padStart(2, '0') : ''}`; }
-            }
-          }
-        }
-      } catch (e) {}
-    }
+    if (actAddress.trim()) { try { const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(actAddress)}`); const geo = await geoRes.json();
+        if (geo && geo.length > 0) { lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon);
+          if (trip?.accommodation_lat && trip?.accommodation_lng) { const osrmRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${trip.accommodation_lng},${trip.accommodation_lat};${lng},${lat}?overview=false`); const osrmData = await osrmRes.json();
+            if (osrmData.routes && osrmData.routes.length > 0) { const mins = Math.round(osrmData.routes[0].duration / 60); if (mins < 60) durationStr = `${mins} min`; else { const h = Math.floor(mins / 60); const m = mins % 60; durationStr = `${h}h${m > 0 ? m.toString().padStart(2, '0') : ''}`; } } } } } catch (e) {} }
     const payload = { trip_id: tripId, title: actTitle, description: actDesc, price: actPrice === '' ? null : actPrice, link: actLink, address: actAddress.trim() || null, lat: lat, lng: lng, duration_from_acc: durationStr, day: actDay, time_slot: actTimeSlot, proposed_by: currentUser.id };
     if (editingActivityId) await supabase.from('activities').update(payload).eq('id', editingActivityId); else await supabase.from('activities').insert([payload]);
     await fetchTripData(); resetActivityForm(); setIsSavingAct(false);
   }
   const handleDeleteActivity = async (id: string | number) => { await supabase.from('activities').delete().eq('id', id); fetchTripData(); }
-  const handleActivityVote = async (actId: string | number, voteType: ActivityVote) => {
-    if (!currentUser) return; await supabase.from('activity_votes').upsert({ activity_id: actId, user_id: currentUser.id, vote: voteType }, { onConflict: 'activity_id, user_id' }); fetchTripData();
-  }
+  const handleActivityVote = async (actId: string | number, voteType: ActivityVote) => { if (!currentUser) return; await supabase.from('activity_votes').upsert({ activity_id: actId, user_id: currentUser.id, vote: voteType }, { onConflict: 'activity_id, user_id' }); fetchTripData(); }
 
-  // --- DÉPENSES ---
+  // Expenses Handlers
   const resetExpenseForm = () => { setEditingExpenseId(null); setExpenseTitle(''); setExpenseAmount(''); setExpensePayer(currentUser?.id || ''); setExpenseSplitAmong(members.map(m => m.id)); setShowExpenseForm(false); };
   const editExpense = (exp: any) => { setEditingExpenseId(exp.id); setExpenseTitle(exp.title); setExpenseAmount(exp.amount); setExpensePayer(exp.paidBy); setExpenseSplitAmong(exp.splitAmong); setShowExpenseForm(true); };
-  
-  const handleSaveExpense = async () => {
-    if (!expenseTitle.trim() || !expenseAmount || Number(expenseAmount) <= 0 || expenseSplitAmong.length === 0 || !expensePayer) return alert("Remplir tous les champs !");
-    const payload = { trip_id: tripId, title: expenseTitle, amount: Number(expenseAmount), paid_by: expensePayer, split_among: expenseSplitAmong };
-    if (editingExpenseId) await supabase.from('expenses').update(payload).eq('id', editingExpenseId); else await supabase.from('expenses').insert([payload]);
-    fetchTripData(); resetExpenseForm();
-  };
+  const handleSaveExpense = async () => { if (!expenseTitle.trim() || !expenseAmount || Number(expenseAmount) <= 0 || expenseSplitAmong.length === 0 || !expensePayer) return alert("Remplir tous les champs !"); const payload = { trip_id: tripId, title: expenseTitle, amount: Number(expenseAmount), paid_by: expensePayer, split_among: expenseSplitAmong }; if (editingExpenseId) await supabase.from('expenses').update(payload).eq('id', editingExpenseId); else await supabase.from('expenses').insert([payload]); fetchTripData(); resetExpenseForm(); };
   const handleDeleteExpense = async (id: string | number) => { await supabase.from('expenses').delete().eq('id', id); fetchTripData(); };
   const handleSettleDebt = async (payerId: string, receiverId: string, amount: number) => { if (!confirm("Confirmer le remboursement ?")) return; await supabase.from('settlements').insert([{ trip_id: tripId, payer_id: payerId, receiver_id: receiverId, amount: amount }]); fetchTripData(); };
-
+  
   const { balances, reimbursements, allKnownMembers } = React.useMemo(() => {
     const userBalances: Record<string, number> = {}; const ghostMembers = [...members]; 
     ghostMembers.forEach((m: Member) => userBalances[m.id] = 0);
@@ -579,161 +450,142 @@ export default function TripPage() {
   }, [members, expenses, settlements]);
   const getMember = (id: string) => allKnownMembers.find(m => m.id === id) || { name: 'Ancien membre 👻', avatar: '👤' };
 
-  // --- MEDIAS ---
+  // Media Handlers
   const handleFileSelectionForBulk = async (e: React.ChangeEvent<HTMLInputElement>) => { 
     if (!e.target.files) return; 
     const files = Array.from(e.target.files); 
-    
     const newPending = await Promise.all(files.map(async (file) => {
       return new Promise<PendingMedia>((resolve) => {
         EXIF.getData(file as any, function(this: any) {
           let lat = null, lng = null, autoDay = selectedSlotForMedia?.day || '', autoSlot = selectedSlotForMedia?.slot || '';
-          
-          const latData = EXIF.getTag(this, 'GPSLatitude');
-          const lngData = EXIF.getTag(this, 'GPSLongitude');
-          const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
-          const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
-          
+          const latData = EXIF.getTag(this, 'GPSLatitude'); const lngData = EXIF.getTag(this, 'GPSLongitude'); const latRef = EXIF.getTag(this, 'GPSLatitudeRef'); const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
           if (latData && lngData && latRef && lngRef && latData.length >= 3 && lngData.length >= 3) {
-            const latDeg = latData[0].numerator / (latData[0].denominator || 1);
-            const latMin = latData[1].numerator / (latData[1].denominator || 1);
-            const latSec = latData[2].numerator / (latData[2].denominator || 1);
-            
-            lat = latDeg + (latMin / 60) + (latSec / 3600);
-            if (latRef === 'S') lat = -lat;
-
-            const lngDeg = lngData[0].numerator / (lngData[0].denominator || 1);
-            const lngMin = lngData[1].numerator / (lngData[1].denominator || 1);
-            const lngSec = lngData[2].numerator / (lngData[2].denominator || 1);
-            
-            lng = lngDeg + (lngMin / 60) + (lngSec / 3600);
-            if (lngRef === 'W') lng = -lng;
+            const latDeg = latData[0].numerator / (latData[0].denominator || 1); const latMin = latData[1].numerator / (latData[1].denominator || 1); const latSec = latData[2].numerator / (latData[2].denominator || 1);
+            lat = latDeg + (latMin / 60) + (latSec / 3600); if (latRef === 'S') lat = -lat;
+            const lngDeg = lngData[0].numerator / (lngData[0].denominator || 1); const lngMin = lngData[1].numerator / (lngData[1].denominator || 1); const lngSec = lngData[2].numerator / (lngData[2].denominator || 1);
+            lng = lngDeg + (lngMin / 60) + (lngSec / 3600); if (lngRef === 'W') lng = -lng;
           }
-
           const dateTime = EXIF.getTag(this, 'DateTimeOriginal');
           if (dateTime && !selectedSlotForMedia) {
-            const [dateStr, timeStr] = dateTime.split(' ');
-            const [y, m, d] = dateStr.split(':');
-            const dateObj = new Date(Number(y), Number(m)-1, Number(d));
+            const [dateStr, timeStr] = dateTime.split(' '); const [y, m, d] = dateStr.split(':'); const dateObj = new Date(Number(y), Number(m)-1, Number(d));
             autoDay = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][dateObj.getDay()];
-            
             const hour = parseInt(timeStr.split(':')[0]);
-            if (hour >= 6 && hour < 12) autoSlot = 'Matin';
-            else if (hour >= 12 && hour < 14) autoSlot = 'Déjeuner';
-            else if (hour >= 14 && hour < 19) autoSlot = 'Après-midi';
-            else if (hour >= 19 && hour < 22) autoSlot = 'Dîner';
-            else autoSlot = 'Soirée';
-            
-            if (autoDay === 'Samedi') {
-              autoDay = hour < 14 ? 'Samedi (Départ)' : 'Samedi (Arrivée)';
-            }
+            if (hour >= 6 && hour < 12) autoSlot = 'Matin'; else if (hour >= 12 && hour < 14) autoSlot = 'Déjeuner'; else if (hour >= 14 && hour < 19) autoSlot = 'Après-midi'; else if (hour >= 19 && hour < 22) autoSlot = 'Dîner'; else autoSlot = 'Soirée';
+            if (autoDay === 'Samedi') autoDay = hour < 14 ? 'Samedi (Départ)' : 'Samedi (Arrivée)';
           }
-
           resolve({ id: Math.random().toString(36).substring(2), file, preview: URL.createObjectURL(file), day: autoDay, time_slot: autoSlot, lat, lng } as PendingMedia & { lat: number | null, lng: number | null });
         });
       });
     }));
-
-    setPendingMediaItems(prev => [...prev, ...newPending]); 
-    e.target.value = ''; 
+    setPendingMediaItems(prev => [...prev, ...newPending]); e.target.value = ''; 
   };
-  
   const updatePendingMedia = (id: string, field: 'day' | 'time_slot', value: string) => { setPendingMediaItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item)); };
   const removePendingMedia = (id: string) => { setPendingMediaItems(prev => { const itemToRevoke = prev.find(item => item.id === id); if (itemToRevoke) URL.revokeObjectURL(itemToRevoke.preview); return prev.filter(item => item.id !== id); }); };
   const closeMediaUploadModal = () => { pendingMediaItems.forEach(item => URL.revokeObjectURL(item.preview)); setPendingMediaItems([]); setShowMediaUploadModal(false); setSelectedSlotForMedia(null); };
 
   const handleBulkMediaUpload = async () => { 
-    if (pendingMediaItems.length === 0) return; 
-    setIsUploading(true); 
+    if (pendingMediaItems.length === 0) return; setIsUploading(true); 
     try { 
-      const { data: { session } } = await supabase.auth.getSession(); 
-      if (!session) return; 
+      const { data: { session } } = await supabase.auth.getSession(); if (!session) return; 
       const uploadPromises = pendingMediaItems.map(async (item: any) => { 
-        const fileExt = item.file.name.split('.').pop(); 
-        const filePath = `${tripId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`; 
-        await supabase.storage.from('trip-media').upload(filePath, item.file); 
-        const { data } = supabase.storage.from('trip-media').getPublicUrl(filePath); 
+        const fileExt = item.file.name.split('.').pop(); const filePath = `${tripId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`; 
+        await supabase.storage.from('trip-media').upload(filePath, item.file); const { data } = supabase.storage.from('trip-media').getPublicUrl(filePath); 
         return { trip_id: tripId, uploader_id: session.user.id, file_path: data.publicUrl, media_type: item.file.type.startsWith('video/') ? 'video' : 'image', day: item.day || null, time_slot: item.time_slot || null, lat: (item as any).lat || null, lng: (item as any).lng || null };      
       }); 
-      const dbPayloads = await Promise.all(uploadPromises); 
-      await supabase.from('media').insert(dbPayloads); 
-      fetchTripData(); 
-      closeMediaUploadModal(); 
-    } catch (error: any) {
-      alert("Erreur lors de l'envoi : " + error.message);
-    } finally { 
-      setIsUploading(false); 
-    } 
+      const dbPayloads = await Promise.all(uploadPromises); await supabase.from('media').insert(dbPayloads); fetchTripData(); closeMediaUploadModal(); 
+    } catch (error: any) { alert("Erreur lors de l'envoi : " + error.message); } finally { setIsUploading(false); } 
   };
 
-  const handleDeleteMedia = async (id: string, url: string) => { if(!confirm("Es-tu sûr de vouloir supprimer cette photo définitivement ?")) return; try { const urlParts = url.split('/'); await supabase.storage.from('trip-media').remove([`${tripId}/${urlParts[urlParts.length - 1]}`]); await supabase.from('media').delete().eq('id', id); fetchTripData(); } catch (error: any) {} }; 
+  const handleDeleteMedia = async (id: string, url: string) => { if(!confirm("Supprimer cette photo définitivement ?")) return; try { const urlParts = url.split('/'); await supabase.storage.from('trip-media').remove([`${tripId}/${urlParts[urlParts.length - 1]}`]); await supabase.from('media').delete().eq('id', id); fetchTripData(); } catch (error: any) {} }; 
   const openEditMedia = (media: MediaItem) => { setEditingMedia(media); setEditMediaDay(media.day || ''); setEditMediaSlot(media.time_slot || ''); };
   const handleSaveMediaEdit = async () => { if (!editingMedia) return; await supabase.from('media').update({ day: editMediaDay || null, time_slot: editMediaSlot || null }).eq('id', editingMedia.id); fetchTripData(); setEditingMedia(null); };
   
-  // CALCUL DES MÉDIAS À AFFICHER (Tri chronologique)
+  // DOWNLOAD ZIP (GALERIE)
+  const toggleMediaSelection = (id: string) => {
+    const newSet = new Set(selectedMediaIds);
+    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+    setSelectedMediaIds(newSet);
+  }
+  
+  const handleDownloadSelected = async () => {
+    if (selectedMediaIds.size === 0) return;
+    setIsDownloading(true);
+    try {
+      const zip = new JSZip();
+      const itemsToDownload = mediaItems.filter(m => selectedMediaIds.has(m.id));
+      
+      const fetchPromises = itemsToDownload.map(async (item, index) => {
+        const response = await fetch(item.file_path);
+        const blob = await response.blob();
+        const ext = item.file_path.split('.').pop() || 'jpg';
+        const filename = `souvenir_${index + 1}.${ext}`;
+        zip.file(filename, blob);
+      });
+
+      await Promise.all(fetchPromises);
+      const content = await zip.generateAsync({ type: 'blob' });
+      
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${trip.name.replace(/\s+/g, '_')}_souvenirs.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setIsSelectionMode(false);
+      setSelectedMediaIds(new Set());
+    } catch (e) {
+      alert("Erreur lors du téléchargement.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const displayedMedia = gallerySortMode === 'moment' 
-    ? [...mediaItems].sort((a, b) => {
-        const dayA = DAY_ORDER[a.day || ''] || 99;
-        const dayB = DAY_ORDER[b.day || ''] || 99;
-        if (dayA !== dayB) return dayA - dayB;
-        
-        const slotA = SLOT_ORDER[a.time_slot || ''] || 99;
-        const slotB = SLOT_ORDER[b.time_slot || ''] || 99;
-        return slotA - slotB;
-      })
+    ? [...mediaItems].sort((a, b) => { const dayA = DAY_ORDER[a.day || ''] || 99; const dayB = DAY_ORDER[b.day || ''] || 99; if (dayA !== dayB) return dayA - dayB; const slotA = SLOT_ORDER[a.time_slot || ''] || 99; const slotB = SLOT_ORDER[b.time_slot || ''] || 99; return slotA - slotB; })
     : mediaItems;
 
-  if (loading && !trip) return <div className="min-h-screen bg-primary-100/60 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
+  if (loading && !trip) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
   if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-primary-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
 
   return (
-    <div className="flex h-screen bg-primary-100/60 font-sans text-gray-900">
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
       <aside className="hidden md:flex flex-col w-64 border-r bg-white shadow-sm z-10">
         <div className="p-6">
           <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-primary-600 mb-4 transition-colors"><ChevronLeft size={14} /> Mes voyages</button>
           <h1 className="text-xl font-black text-primary-600 tracking-tight truncate">{trip.name}</h1>
           <button 
-            onClick={() => { 
-              const inviteLink = `${window.location.origin}/join/${trip.invite_code}`;
-              navigator.clipboard.writeText(inviteLink); 
-              alert("Lien d'invitation copié ! Envoie-le à tes potes 🚀"); 
-            }} 
+            onClick={() => { const inviteLink = `${window.location.origin}/join/${trip.invite_code}`; navigator.clipboard.writeText(inviteLink); alert("Lien copié !"); }} 
             className="mt-4 flex items-center gap-2 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-2 rounded-xl hover:bg-primary-100 transition-colors shadow-sm w-fit group"
           >
             <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien
           </button>
-          <button onClick={() => setShowMembersModal(true)} className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-primary-100/60 px-3 py-2 rounded-xl hover:bg-primary-100 transition-colors shadow-sm w-fit">
+          <button onClick={() => setShowMembersModal(true)} className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors shadow-sm w-fit">
             <Users size={14} /> {members.length} participant(s)
           </button>        
         </div>
-        <div className="flex gap-3 mt-4 items-center">
-  <span className="text-xs font-bold text-gray-400 uppercase">Thème</span>
-  <button onClick={() => changeTheme('sauge-terracotta')} title="Sauge & Terracotta" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('lavande-moutarde')} title="Lavande & Moutarde" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('sable-azur')} title="Sable & Azur" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-  <button onClick={() => changeTheme('rose-sapin')} title="Rose & Sapin" className={`w-5 h-5 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-        </div>
+        
         <nav className="flex-1 px-4 space-y-2 mt-2">
-          <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'}`}>
-            <div className="flex items-center gap-3"><Target size={20} /> Destination</div>
+          <button onClick={() => setActiveTab('destination')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'destination' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <div className="flex items-center gap-3"><Target size={20} /> {isLocked ? 'Logistique' : 'Destination'}</div>
             {!isLocked && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
           </button>
 
           <div className="pt-4 mt-4 border-t border-gray-100">
             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 px-2">Organisation</p>
-            <button onClick={(e) => checkLock('calendar', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'calendar' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><CalendarDays size={20} /> Planning</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('activities', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'activities' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Compass size={20} /> Activités</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('meals', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'meals' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Utensils size={20} /> Repas & Courses</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('expenses', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'expenses' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><PieChart size={20} /> Comptes</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
-            <button onClick={(e) => checkLock('gallery', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'gallery' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-primary-100/60'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Camera size={20} /> Galerie</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('calendar', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'calendar' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><CalendarDays size={20} /> Planning</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('activities', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'activities' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Compass size={20} /> Activités</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('meals', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'meals' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Utensils size={20} /> Repas & Courses</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('expenses', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'expenses' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><PieChart size={20} /> Comptes</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
+            <button onClick={(e) => checkLock('gallery', e)} className={`w-full flex justify-between items-center px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'gallery' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'} ${!isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}><div className="flex items-center gap-3"><Camera size={20} /> Galerie</div>{!isLocked && <Lock size={14} className="text-gray-400"/>}</button>
           </div>
         </nav>
-        <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-primary-100/60 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
+        <div className="p-4 border-t border-gray-100"><button onClick={() => router.push('/profile')} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors"><Users size={14} /> Mon Profil</button></div>
       </aside>
 
-<main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-        
-        {/* EN-TÊTE MOBILE & THÈMES */}
+      <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
         <div className="md:hidden bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
           <div className="p-4 flex items-center justify-between">
             <div>
@@ -742,26 +594,19 @@ export default function TripPage() {
               </button>
               <h1 className="font-black text-primary-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
             </div>
-            <button 
-              onClick={() => setShowMembersModal(true)} 
-              className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors"
-            >
+            <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors">
               <Users size={18} />
             </button>
           </div>
-          
         </div>
         
-        {/* === INJECTION DE LA DATALIST GLOBALE === */}
-        
-        {/* === INJECTION DE LA DATALIST GLOBALE === */}
         <datalist id="ingredients-list">
           {allIngredients.map((ing, idx) => <option key={idx} value={ing} />)}
         </datalist>
 
         <div className="p-4 md:p-8">
           
-          {/* ONGLET DESTINATION */}
+          {/* ONGLET DESTINATION & LOGISTIQUE */}
           {activeTab === 'destination' && (
             <div className="max-w-6xl mx-auto space-y-8">
               {!trip.trip_region ? (
@@ -773,7 +618,7 @@ export default function TripPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div className="bg-primary-100/60 rounded-2xl p-5 border border-gray-100">
+                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-primary-600"/> La semaine</h3>
                       <div className="space-y-3 mb-4">
                         {proposedWeeks.map(w => (
@@ -809,7 +654,7 @@ export default function TripPage() {
                         </div>
                       </form>
                     </div>
-                    <div className="bg-primary-100/60 rounded-2xl p-5 border border-gray-100">
+                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-primary-600"/> La Zone Géo</h3>
                       <div className="space-y-3 mb-4">
                         {proposedRegions.map(r => {
@@ -868,10 +713,10 @@ export default function TripPage() {
                       <h2 className="font-black text-2xl text-gray-800 leading-tight">Objectif : {trip.trip_region} 🏡</h2>
                       <p className="text-gray-500 text-sm font-semibold">{trip.trip_week}</p>
                     </div>
-                    {isAdmin && <button onClick={handleUnlockPhase1} className="text-xs font-bold text-gray-400 hover:text-red-500 bg-primary-100/60 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors">Modifier région</button>}
+                    {isAdmin && <button onClick={handleUnlockPhase1} className="text-xs font-bold text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors">Modifier région</button>}
                   </div>
 
-                  <div className="bg-primary-100/60 rounded-2xl p-5 border border-gray-100 mb-8">
+                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 mb-8">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2"><Home size={18} className="text-primary-600"/> Les Gîtes trouvés</h3>
                       <button onClick={() => setShowPlaceForm(true)} className="text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:text-primary-600"><Plus size={14}/> Proposer un gîte</button>
@@ -932,7 +777,8 @@ export default function TripPage() {
 
               ) : (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-primary-100 shadow-md relative overflow-hidden">
+                  {/* EN TÊTE LOGISTIQUE */}
+                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-primary-100 shadow-sm relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-500 to-purple-500"></div>
                     <div className="flex justify-between items-start mb-6">
                       <div>
@@ -940,10 +786,10 @@ export default function TripPage() {
                         <h3 className="font-black text-3xl text-gray-800 tracking-tight">{trip.trip_region}</h3>
                         <p className="text-gray-500 mt-1 font-bold">{trip.trip_week}</p>
                       </div>
-                      {isAdmin && <button onClick={handleUnlockTrip} className="text-gray-400 hover:text-red-500 bg-primary-100/60 hover:bg-red-50 p-2 rounded-xl transition-colors" title="Déverrouiller"><Unlock size={18} /></button>}
+                      {isAdmin && <button onClick={handleUnlockTrip} className="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 p-2 rounded-xl transition-colors" title="Déverrouiller"><Unlock size={18} /></button>}
                     </div>
 
-                    <div className="bg-primary-100/60 rounded-2xl p-4 border border-gray-100 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="font-bold text-gray-800 text-lg flex items-center gap-2"><Home size={20} className="text-primary-600"/> {trip.accommodation_name}</div>
                         <div className="text-sm text-gray-500 flex items-center gap-1 mt-1"><MapPin size={14}/> {trip.accommodation_address}</div>
@@ -951,10 +797,104 @@ export default function TripPage() {
                       <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(trip.accommodation_address)}`} target="_blank" rel="noreferrer" className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:text-primary-600 flex items-center gap-2 whitespace-nowrap"><MapIcon size={16}/> Ouvrir le GPS</a>
                     </div>
 
-                    <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-primary-100/60">
+                    <div className="border border-gray-200 rounded-2xl overflow-hidden p-1 bg-gray-50">
                       <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><MapIcon size={14}/> Carte Logistique</div>
                       <MapView activities={activities} finalGite={{ name: trip.accommodation_name, lat: trip.accommodation_lat, lng: trip.accommodation_lng }} photos={mediaItems} />
                     </div>
+                  </div>
+
+                  {/* NOUVEAUX MODULES LOGISTIQUES */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* MODULE 1: TRANSPORTS */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4"><Car size={20} className="text-primary-600"/> Transports & Arrivées</h3>
+                      
+                      <div className="space-y-3 mb-6">
+                        {transports.filter(t => t.user_id !== currentUser?.id).map(t => (
+                          <div key={t.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shrink-0 border border-primary-200">
+                              {getTransportIcon(t.mode)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-sm text-gray-800 flex items-center gap-2">{getMember(t.user_id)?.name} {t.seats_available > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{t.seats_available} places</span>}</div>
+                              <div className="text-xs text-gray-500 truncate">De {t.coming_from || '?'} • Arrive à {t.arrival_time || '?'}</div>
+                            </div>
+                          </div>
+                        ))}
+                        {transports.length === 0 && <div className="text-sm text-gray-400 italic">Personne n'a encore indiqué son transport.</div>}
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-bold text-sm text-gray-800">Mon trajet</span>
+                          {!isEditingTransport && <button onClick={() => setIsEditingTransport(true)} className="text-xs text-primary-600 font-bold bg-primary-50 px-3 py-1.5 rounded-lg">{transports.some(t => t.user_id === currentUser?.id) ? 'Modifier' : 'Renseigner'}</button>}
+                        </div>
+                        
+                        {isEditingTransport ? (
+                          <form onSubmit={handleSaveTransport} className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              <select value={myTransport.mode} onChange={e => setMyTransport({...myTransport, mode: e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none">
+                                <option>Voiture</option><option>Train</option><option>Avion</option><option>Covoiturage</option><option>Moto</option>
+                              </select>
+                              <input type="text" value={myTransport.arrival_time} onChange={e => setMyTransport({...myTransport, arrival_time: e.target.value})} placeholder="Heure d'arrivée" className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none" />
+                            </div>
+                            <input type="text" value={myTransport.coming_from} onChange={e => setMyTransport({...myTransport, coming_from: e.target.value})} placeholder="Départ de (Ville)" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none" />
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-gray-500 font-bold">Places libres :</label>
+                              <input type="number" value={myTransport.seats_available} onChange={e => setMyTransport({...myTransport, seats_available: Number(e.target.value)})} className="w-16 border border-gray-200 rounded-xl px-2 py-1.5 text-sm bg-white text-center outline-none" />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <button type="button" onClick={() => setIsEditingTransport(false)} className="flex-1 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl">Annuler</button>
+                              <button type="submit" className="flex-1 py-2 text-xs font-bold text-white bg-primary-600 rounded-xl shadow-sm">Valider</button>
+                            </div>
+                          </form>
+                        ) : (
+                          transports.some(t => t.user_id === currentUser?.id) ? (
+                            <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-xl border border-primary-100">
+                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary-600 shrink-0 shadow-sm">
+                                {getTransportIcon(myTransport.mode || 'Voiture')}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm text-primary-800">En {myTransport.mode} {myTransport.seats_available ? <span className="text-[10px] ml-1 bg-primary-200 text-primary-800 px-1.5 py-0.5 rounded">+{myTransport.seats_available} places</span> : ''}</div>
+                                <div className="text-xs text-primary-600 truncate">Depuis {myTransport.coming_from} • À {myTransport.arrival_time}</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-orange-600 bg-orange-50 border border-orange-100 p-3 rounded-xl">Tu n'as pas encore indiqué comment tu venais !</div>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* MODULE 2: QUI AMÈNE QUOI */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4"><Backpack size={20} className="text-primary-600"/> Matériel partagé</h3>
+                      <p className="text-xs text-gray-500 mb-4">Jeux de société, enceinte, appareil à raclette... Évitons les doublons !</p>
+                      
+                      <div className="space-y-2 mb-4 max-h-[40vh] overflow-y-auto pr-1">
+                        {equipments.map(eq => (
+                          <div key={eq.id} onClick={() => toggleEquipmentAssign(eq)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer group transition-colors ${eq.assignee_id ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-primary-50'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded flex items-center justify-center border ${eq.assignee_id ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 text-transparent'}`}><Check size={14}/></div>
+                              <span className={`text-sm font-semibold ${eq.assignee_id ? 'text-gray-500' : 'text-gray-800'}`}>{eq.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {eq.assignee_id && <span className="text-[10px] font-bold bg-white px-2 py-1 border rounded-lg text-primary-600 shadow-sm">{getMember(eq.assignee_id)?.name}</span>}
+                              {(isAdmin || !eq.assignee_id || eq.assignee_id === currentUser?.id) && (
+                                <button onClick={(e) => deleteEquipment(eq.id, e)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <form onSubmit={handleAddEquipment} className="flex gap-2">
+                        <input type="text" value={newEquipment} onChange={e => setNewEquipment(e.target.value)} placeholder="Ajouter un objet..." className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 outline-none" />
+                        <button type="submit" disabled={!newEquipment.trim()} className="bg-primary-600 text-white px-4 py-2 rounded-xl disabled:opacity-50 font-bold"><Plus size={18}/></button>
+                      </form>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -1004,12 +944,12 @@ export default function TripPage() {
               )}
 
               <div className="space-y-4">
-                <div className="flex overflow-x-auto gap-2 pb-2 snap-x hide-scrollbar sticky top-[60px] md:top-0 z-10 bg-primary-100/60/95 backdrop-blur-sm pt-2 -mx-4 px-4 md:mx-0 md:px-0">
+                <div className="flex overflow-x-auto gap-2 pb-2 snap-x hide-scrollbar sticky top-[60px] md:top-0 z-10 bg-gray-50/95 backdrop-blur-sm pt-2 -mx-4 px-4 md:mx-0 md:px-0">
                   {WEEK_DAYS.map(day => (
                     <button
                       key={day}
                       onClick={() => setSelectedPlanningDay(day)}
-                      className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${selectedPlanningDay === day ? 'bg-primary-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-primary-100/60'}`}
+                      className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${selectedPlanningDay === day ? 'bg-primary-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
                     >
                       {day}
                     </button>
@@ -1027,9 +967,9 @@ export default function TripPage() {
                       const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
                       
                       return (
-                        <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-primary-100/60/30 transition-colors">
+                        <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
                           <div className="w-32 flex-shrink-0 flex flex-col gap-2">
-                            <span className="font-bold text-sm text-gray-400 bg-primary-100/60 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
+                            <span className="font-bold text-sm text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">{slot}</span>
                             {(() => {
                               const slotPhotos = mediaItems.filter((m: any) => m.day === day && m.time_slot === slot);
                               return (
@@ -1154,7 +1094,7 @@ export default function TripPage() {
                 <div className="space-y-4">
                   {WEEK_DAYS.map(day => (
                     <div key={day} className="bg-white rounded-2xl border shadow-sm">
-                      <div className="bg-primary-100/60 px-4 py-2 border-b font-bold text-gray-700">{day}</div>
+                      <div className="bg-gray-50 px-4 py-2 border-b font-bold text-gray-700">{day}</div>
                       <div className="divide-y">
                         {['Déjeuner', 'Dîner'].map(type => {
                           const meal = meals.find(m => m.day === day && m.type === type);
@@ -1168,7 +1108,7 @@ export default function TripPage() {
                                     <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-2"><button onClick={() => editMeal(meal)} className="p-1 border rounded bg-white text-gray-400 hover:text-primary-600"><Pencil size={14}/></button><button onClick={() => handleDeleteMeal(meal.id)} className="p-1 border rounded bg-white text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></div>
                                     <h3 className="font-bold text-lg mb-2">🍲 {meal.name} {meal.recipeLink && <a href={meal.recipeLink} target="_blank" className="text-primary-500 text-xs"><ExternalLink size={10} className="inline"/></a>}</h3>
                                     <div className="text-sm text-gray-500 space-y-1 mb-3">{meal.starter && <div>🥗 {meal.starter}</div>} {meal.dessert && <div>🍰 {meal.dessert}</div>} {meal.drinks && <div>🥂 {meal.drinks}</div>}</div>
-                                    <div className="flex gap-2 flex-wrap">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-primary-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
+                                    <div className="flex gap-2 flex-wrap">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
                                   </div>
                                 )}
                                 {mealActivities.map(act => (
@@ -1192,7 +1132,7 @@ export default function TripPage() {
               {/* LISTE DE COURSES AVEC SÉLECTEUR DE CATÉGORIE EN LIGNE */}
               <div className="w-full lg:w-96">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
-                  <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-primary-600"/> Courses</h3><span className="text-xs font-bold bg-primary-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
+                  <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-primary-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
                   
                   <form onSubmit={handleAddExtraItem} className="flex gap-2 mb-4">
                     <input type="text" list="ingredients-list" value={newExtraItem} onChange={e => setNewExtraItem(e.target.value)} placeholder="Article libre (Bières)" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
@@ -1209,7 +1149,7 @@ export default function TripPage() {
                           <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-1 mb-2 text-sm">{category}</h4>
                           <div className="space-y-1.5">
                             {itemsInCategory.map((item, idx) => (
-                              <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-primary-100/60 opacity-50 border-transparent' : 'bg-white hover:border-primary-100 border-gray-100 shadow-sm'}`}>
+                              <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-gray-50 opacity-50 border-transparent' : 'bg-white hover:border-primary-100 border-gray-100 shadow-sm'}`}>
                                 <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border shrink-0 ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-start gap-2">
@@ -1217,7 +1157,6 @@ export default function TripPage() {
                                       {item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}
                                     </span>
                                     
-                                    {/* --- NOUVEAU MENU DÉROULANT POUR MODIFIER LA CATÉGORIE GLOBALE --- */}
                                     <div className="flex items-center gap-2 shrink-0">
                                       <select 
                                         value={item.category}
@@ -1302,7 +1241,7 @@ export default function TripPage() {
                     {allKnownMembers.map(m => {
                       const b = balances[m.id] || 0;
                       return (
-                        <div key={m.id} className="flex justify-between items-center p-2 rounded hover:bg-primary-100/60">
+                        <div key={m.id} className="flex justify-between items-center p-2 rounded hover:bg-gray-50">
                           <div className="flex gap-2 items-center"><div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs">{m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover rounded-full" /> : m.avatar}</div> <span className="text-sm font-semibold">{m.name}</span></div>
                           <span className={`font-bold text-sm ${b > 0.01 ? 'text-green-600' : b < -0.01 ? 'text-red-600' : 'text-gray-400'}`}>{b > 0 ? '+' : ''}{b.toFixed(2)} €</span>
                         </div>
@@ -1314,7 +1253,7 @@ export default function TripPage() {
                     <div className="mt-6 border-t pt-4">
                       <h4 className="text-xs font-bold text-gray-400 mb-3 uppercase">Remboursements</h4>
                       {reimbursements.map((r, idx) => (
-                        <div key={idx} className="flex flex-col gap-2 mb-3 p-3 bg-primary-100/60 rounded-xl border border-gray-100">
+                        <div key={idx} className="flex flex-col gap-2 mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                           <div className="flex justify-between items-center text-sm">
                             <span>{getMember(r.from)?.name} <ArrowRight size={12} className="inline mx-1"/> {getMember(r.to)?.name}</span>
                             <span className="font-bold text-primary-600">{r.amount.toFixed(2)} €</span>
@@ -1361,7 +1300,7 @@ export default function TripPage() {
                       <div className="flex flex-wrap gap-2">
                         {allKnownMembers.map(m => {
                           const isInc = expenseSplitAmong.includes(m.id);
-                          return <button key={m.id} onClick={() => setExpenseSplitAmong(isInc ? expenseSplitAmong.filter(id => id !== m.id) : [...expenseSplitAmong, m.id])} className={`px-2 py-1 rounded border text-xs font-medium ${isInc ? 'bg-primary-600 text-white' : 'bg-primary-100/60'}`}>{m.name}</button>
+                          return <button key={m.id} onClick={() => setExpenseSplitAmong(isInc ? expenseSplitAmong.filter(id => id !== m.id) : [...expenseSplitAmong, m.id])} className={`px-2 py-1 rounded border text-xs font-medium ${isInc ? 'bg-primary-600 text-white' : 'bg-gray-50'}`}>{m.name}</button>
                         })}
                       </div>
                     </div>
@@ -1375,14 +1314,36 @@ export default function TripPage() {
           {/* GALERIE */}
           {activeTab === 'gallery' && (
             <div className="max-w-6xl mx-auto space-y-6 relative">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4 sticky top-[60px] md:top-0 bg-white/90 backdrop-blur-sm z-10 pt-2 -mx-4 px-4 md:mx-0 md:px-0">
                 <h2 className="text-2xl font-bold text-gray-800">Souvenirs 📸</h2>
-                <div className="flex items-center gap-3">
-                  <div className="flex bg-primary-100 p-1 rounded-lg">
-                    <button onClick={() => setGallerySortMode('date')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'date' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Récents</button>
-                    <button onClick={() => setGallerySortMode('moment')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'moment' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Par moment</button>
-                  </div>
-                  <button onClick={() => setShowMediaUploadModal(true)} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-primary-700 shadow-sm"><Plus size={18} /> Ajouter</button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  
+                  {/* BOUTONS DE SÉLECTION / TÉLÉCHARGEMENT */}
+                  {mediaItems.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {isSelectionMode ? (
+                        <>
+                          <span className="text-sm font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-lg">{selectedMediaIds.size} sélectionné(s)</span>
+                          <button onClick={handleDownloadSelected} disabled={isDownloading || selectedMediaIds.size === 0} className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-700 disabled:opacity-50">
+                            {isDownloading ? <Loader2 className="animate-spin" size={14}/> : <><Download size={14}/> ZIP</>}
+                          </button>
+                          <button onClick={() => {setIsSelectionMode(false); setSelectedMediaIds(new Set())}} className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-gray-200">Annuler</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setIsSelectionMode(true)} className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-gray-200 flex items-center gap-2"><Check size={14}/> Sélectionner</button>
+                      )}
+                    </div>
+                  )}
+
+                  {!isSelectionMode && (
+                    <>
+                      <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button onClick={() => setGallerySortMode('date')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'date' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Récents</button>
+                        <button onClick={() => setGallerySortMode('moment')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${gallerySortMode === 'moment' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}>Par moment</button>
+                      </div>
+                      <button onClick={() => setShowMediaUploadModal(true)} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-primary-700 shadow-sm"><Plus size={18} /> Ajouter</button>
+                    </>
+                  )}
                 </div>
               </div>
               
@@ -1391,17 +1352,30 @@ export default function TripPage() {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {displayedMedia.map((media, idx) => (
-                    <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-primary-100 border border-gray-200 shadow-sm">
+                    <div 
+                      key={media.id} 
+                      onClick={() => isSelectionMode ? toggleMediaSelection(media.id) : openViewer(displayedMedia, idx)}
+                      className={`relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border-2 shadow-sm cursor-pointer transition-all ${isSelectionMode && selectedMediaIds.has(media.id) ? 'border-primary-500 scale-95 opacity-80' : 'border-transparent hover:border-gray-200'}`}
+                    >
                       
-                      {gallerySortMode === 'moment' && (media.day || media.time_slot) && (
+                      {gallerySortMode === 'moment' && (media.day || media.time_slot) && !isSelectionMode && (
                         <div className="absolute top-2 left-2 z-10 bg-black/50 text-white text-[10px] px-2 py-1 rounded-md pointer-events-none backdrop-blur-sm">
                           {media.day?.replace(' (Arrivée)','').replace(' (Départ)','')} {media.time_slot ? `- ${media.time_slot}` : ''}
                         </div>
                       )}
 
+                      {/* OVERLAY DE SÉLECTION */}
+                      {isSelectionMode && (
+                        <div className="absolute top-2 left-2 z-20">
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedMediaIds.has(media.id) ? 'bg-primary-500 border-primary-500 text-white' : 'bg-black/30 border-white text-transparent'}`}>
+                            <Check size={14} />
+                          </div>
+                        </div>
+                      )}
+
                       {media.media_type === 'video' ? (
                         <>
-                          <video src={media.file_path} className="w-full h-full object-cover cursor-pointer" onClick={() => openViewer(displayedMedia, idx)} />
+                          <video src={media.file_path} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white">
                               <Play size={20} fill="currentColor" />
@@ -1409,13 +1383,15 @@ export default function TripPage() {
                           </div>
                         </>
                       ) : (
-                        <img src={media.file_path} alt="Souvenir" onClick={() => openViewer(displayedMedia, idx)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />
+                        <img src={media.file_path} alt="Souvenir" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                       )}
                       
-                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10">
-                        <button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-primary-600"><Pencil size={14} /></button>
-                        <button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button>
-                      </div>                        
+                      {!isSelectionMode && (
+                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 z-10" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => openEditMedia(media)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-primary-600"><Pencil size={14} /></button>
+                          <button onClick={() => handleDeleteMedia(media.id, media.file_path)} className="bg-white/90 p-1.5 rounded-lg text-gray-500 hover:text-red-500"><Trash2 size={14} /></button>
+                        </div>
+                      )}                        
                     </div>
                   ))}
                 </div>
@@ -1425,7 +1401,7 @@ export default function TripPage() {
           
           {/* MODALES DE MEDIA */}
           {showMediaUploadModal && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-primary-900/60 backdrop-blur-sm p-4">
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
               <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-5 max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-gray-800">Ajouter des souvenirs</h3>
@@ -1436,7 +1412,7 @@ export default function TripPage() {
                 
                 <div className="overflow-y-auto space-y-3 mb-4 flex-1 pr-2">
                   {pendingMediaItems.map(item => (
-                    <div key={item.id} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-primary-100/60 rounded-xl border border-gray-100">
+                    <div key={item.id} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <img src={item.preview} className="w-16 h-16 object-cover rounded-lg shrink-0" alt="Aperçu" />
                       <div className="flex-1 w-full grid grid-cols-2 gap-2">
                         <select value={item.day} onChange={e => updatePendingMedia(item.id, 'day', e.target.value)} className="border rounded-lg px-2 py-2 text-xs bg-white text-gray-700">
@@ -1461,12 +1437,12 @@ export default function TripPage() {
               <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
                 <div className="flex justify-between items-center">
                   <h3 className="font-bold text-gray-800">Classer ce souvenir</h3>
-                  <button onClick={() => setEditingMedia(null)} className="text-gray-400 hover:text-gray-600 bg-primary-100/60 p-1.5 rounded-lg"><X size={18}/></button>
+                  <button onClick={() => setEditingMedia(null)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
                 </div>
-                <select value={editMediaDay} onChange={e => setEditMediaDay(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-primary-100/60 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                <select value={editMediaDay} onChange={e => setEditMediaDay(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
                   <option value="">Aucun jour défini</option>{WEEK_DAYS.map(d => <option key={d}>{d}</option>)}
                 </select>
-                <select value={editMediaSlot} onChange={e => setEditMediaSlot(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-primary-100/60 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                <select value={editMediaSlot} onChange={e => setEditMediaSlot(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
                   <option value="">Aucun moment défini</option>
                   {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée', 'Journée entière'].map(s => <option key={s}>{s}</option>)}
                 </select>
@@ -1475,7 +1451,7 @@ export default function TripPage() {
             </div>
           )}
 
-          {viewerCurrentIndex !== null && viewerItems.length > 0 && (
+          {viewerCurrentIndex !== null && viewerItems.length > 0 && !isSelectionMode && (
             <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center backdrop-blur-md">
               <button onClick={closeViewer} className="absolute top-4 right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><X size={24} /></button>
               {viewerItems.length > 1 && ( <><button onClick={prevMedia} className="absolute left-4 p-3 bg-white/10 rounded-full text-white z-[210]"><ChevronLeft size={32} /></button><button onClick={nextMedia} className="absolute right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><ChevronRight size={32} /></button></>)}
@@ -1493,11 +1469,11 @@ export default function TripPage() {
           <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-lg text-gray-800">Équipe ({members.length})</h3>
-              <button onClick={() => setShowMembersModal(false)} className="text-gray-400 hover:text-gray-600 bg-primary-100/60 p-1.5 rounded-lg"><X size={18}/></button>
+              <button onClick={() => setShowMembersModal(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
             </div>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               {members.map(m => (
-                <div key={m.id} className="flex items-center justify-between p-3 bg-primary-100/60 rounded-xl border border-gray-100">
+                <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-primary-200">
                       {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
@@ -1523,7 +1499,7 @@ export default function TripPage() {
       <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'destination' ? 'text-primary-600 font-bold' : 'text-gray-400'}`}>
           <div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div>
-          <span className="text-[10px] mt-1">Lieu</span>
+          <span className="text-[10px] mt-1">{isLocked ? 'Logistique' : 'Lieu'}</span>
         </button>
         <button onClick={(e) => checkLock('calendar', e)} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'calendar' ? 'text-primary-600 font-bold' : 'text-gray-400'} ${!isLocked ? 'opacity-50' : ''}`}>
           <CalendarDays size={20} /><span className="text-[10px] mt-1">Planning</span>
