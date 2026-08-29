@@ -176,10 +176,10 @@ export default function Dashboard() {
   const activeTrips = trips.filter(t => !t.is_archived);
   const archivedTrips = trips.filter(t => t.is_archived);
 
-  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement du tableau de bord...</div>
+  if (loading) return <div className="min-h-screen bg-primary-50/40 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement du tableau de bord...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="min-h-screen bg-primary-50/40 font-sans text-gray-900">
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -204,8 +204,8 @@ export default function Dashboard() {
             <span className="font-black text-lg">Créer un nouveau voyage</span>
           </button>
           
-          <button onClick={() => { setShowJoinModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-white border border-gray-200 text-gray-800 p-8 rounded-3xl hover:border-primary-300 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 bg-gray-50 text-primary-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Key size={24} /></div>
+          <button onClick={() => { setShowJoinModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-white border border-primary-200/70 text-gray-800 p-8 rounded-3xl hover:border-primary-300 hover:shadow-md transition-all group">
+            <div className="w-12 h-12 bg-primary-50/40 text-primary-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Key size={24} /></div>
             <span className="font-black text-lg">Rejoindre avec un code</span>
           </button>
         </div>
@@ -227,7 +227,7 @@ export default function Dashboard() {
                     
                     <button 
                       onClick={(e) => toggleArchive(trip.id, trip.is_archived, e)}
-                      className="absolute top-4 right-4 p-2 bg-gray-50 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                      className="absolute top-4 right-4 p-2 bg-primary-50/40 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                       title="Archiver ce voyage"
                     >
                       <Archive size={16} />
@@ -241,7 +241,7 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-500 line-clamp-2 mb-4">{trip.description || "Aucune description"}</p>
                     </div>
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between mt-auto">
-                      <div className="text-xs font-semibold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">Code: {trip.invite_code}</div>
+                      <div className="text-xs font-semibold text-gray-400 bg-primary-50/40 px-2 py-1 rounded-md">Code: {trip.invite_code}</div>
                       <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors"><ChevronRight size={16} /></div>
                     </div>
                   </div>
@@ -257,7 +257,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 opacity-70 hover:opacity-100 transition-opacity">
               {archivedTrips.map(trip => (
                 <Link key={trip.id} href={`/trip/${trip.id}`} className="block group">
-                  <div className="bg-gray-50 p-5 rounded-3xl border border-gray-200 hover:shadow-md transition-all h-full flex flex-col relative">
+                  <div className="bg-primary-50/40 p-5 rounded-3xl border border-primary-200/70 hover:shadow-md transition-all h-full flex flex-col relative">
                     
                     <button 
                       onClick={(e) => toggleArchive(trip.id, trip.is_archived, e)}
@@ -285,7 +285,7 @@ export default function Dashboard() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-primary-50/40/50">
               <h3 className="font-bold text-xl text-gray-800">Nouveau voyage</h3>
               <button onClick={() => setShowCreateModal(false)} className="p-2 bg-white rounded-xl text-gray-400 hover:text-gray-600 shadow-sm border border-gray-100"><X size={18}/></button>
             </div>
@@ -293,11 +293,11 @@ export default function Dashboard() {
               {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium border border-red-100">{error}</div>}
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Où allez-vous ?</label>
-                <input type="text" value={newTripName} onChange={e => setNewTripName(e.target.value)} placeholder="Ex: Week-end Ardèche 🏕️" required autoFocus className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none font-semibold text-gray-800" />
+                <input type="text" value={newTripName} onChange={e => setNewTripName(e.target.value)} placeholder="Ex: Week-end Ardèche 🏕️" required autoFocus className="w-full px-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none font-semibold text-gray-800" />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Description (Optionnel)</label>
-                <textarea value={newTripDesc} onChange={e => setNewTripDesc(e.target.value)} placeholder="Ex: Du 12 au 15 Août." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none h-24" />
+                <textarea value={newTripDesc} onChange={e => setNewTripDesc(e.target.value)} placeholder="Ex: Du 12 au 15 Août." className="w-full px-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none h-24" />
               </div>
               <button type="submit" disabled={actionLoading || !newTripName.trim()} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-primary-700 shadow-md shadow-primary-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2">
                 {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />} Créer le voyage
@@ -311,7 +311,7 @@ export default function Dashboard() {
       {showJoinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-primary-50/40/50">
               <h3 className="font-bold text-xl text-gray-800">Rejoindre les copains</h3>
               <button onClick={() => setShowJoinModal(false)} className="p-2 bg-white rounded-xl text-gray-400 hover:text-gray-600 shadow-sm border border-gray-100"><X size={18}/></button>
             </div>
@@ -321,7 +321,7 @@ export default function Dashboard() {
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Code d'invitation</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400"><Key size={18} /></div>
-                  <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Ex: a1b2c3d4" required autoFocus maxLength={8} className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-lg tracking-widest focus:ring-2 focus:ring-primary-500 outline-none font-black text-gray-800" />
+                  <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Ex: a1b2c3d4" required autoFocus maxLength={8} className="w-full pl-11 pr-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-lg tracking-widest focus:ring-2 focus:ring-primary-500 outline-none font-black text-gray-800" />
                 </div>
               </div>
               <button type="submit" disabled={actionLoading || joinCode.length < 4} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-primary-700 shadow-md shadow-primary-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2 mt-4">

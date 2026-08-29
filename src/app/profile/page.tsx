@@ -175,7 +175,7 @@ export default function ProfilePage() {
   if (loading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-gray-400" /></div>
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-primary-50/40 flex flex-col items-center justify-center p-4">
       <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6 my-8">
         <div className="flex justify-between items-center mb-2">
           <button onClick={() => router.push('/')} className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-sm font-bold transition-colors">
@@ -213,7 +213,7 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Mon prénom / Pseudo</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-primary-50/40 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer le profil
@@ -242,7 +242,7 @@ export default function ProfilePage() {
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-primary-50/40 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-primary-50/40 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />

@@ -13,7 +13,7 @@
   --color-primary-900: var(--p-900);
 }
 
-/* Thème Violet (défaut) */
+/* THÈME VIOLET (Défaut) : Fonds pastel violet/indigo doux */
 :root, html[data-theme='violet'] {
   --p-50: #eef2ff;
   --p-100: #e0e7ff;
@@ -25,8 +25,11 @@
   --p-700: #4338ca;
   --p-800: #3730a3;
   --p-900: #312e81;
+  --bg-page: #f5f7ff;
+  --bg-card: #e0e7ff55;
 }
 
+/* THÈME VERT SAUGE : Retrouve ton magnifique vert prononcé ! */
 html[data-theme='green'] {
   --p-50: #ecfdf5;
   --p-100: #d1fae5;
@@ -38,8 +41,11 @@ html[data-theme='green'] {
   --p-700: #047857;
   --p-800: #065f46;
   --p-900: #064e3b;
+  --bg-page: #97b5a5; /* Ton fond vert prononcé */
+  --bg-card: #c0e8cd; /* Fond de carte assorti */
 }
 
+/* THème NEUTRAL (Blanc / Gris perle) */
 html[data-theme='neutral'] {
   --p-50: #f8fafc;
   --p-100: #f1f5f9;
@@ -51,8 +57,11 @@ html[data-theme='neutral'] {
   --p-700: #334155;
   --p-800: #1e293b;
   --p-900: #0f172a;
+  --bg-page: #f1f5f9;
+  --bg-card: #ffffff;
 }
 
+/* THÈME ROSE PASTEL */
 html[data-theme='rose'] {
   --p-50: #fff1f2;
   --p-100: #ffe4e6;
@@ -64,6 +73,8 @@ html[data-theme='rose'] {
   --p-700: #be123c;
   --p-800: #9f1239;
   --p-900: #881337;
+  --bg-page: #fff1f2;
+  --bg-card: #ffe4e666;
 }
 
 @theme inline {
@@ -72,7 +83,8 @@ html[data-theme='rose'] {
 }
 
 body {
-  background: #f8fafc;
+  background-color: var(--bg-page) !important;
   color: #1f2937;
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease;
 }

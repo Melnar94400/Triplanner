@@ -77,7 +77,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-primary-50/40 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-gray-100">
         <div className="bg-primary-600 p-8 text-center">
           <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
@@ -108,7 +108,7 @@ function LoginContent() {
                     type="text" 
                     value={pseudo}
                     onChange={(e) => setPseudo(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                    className="w-full pl-11 pr-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                     placeholder="Ton pseudo (unique)"
                     required={!isLogin}
                   />
@@ -128,7 +128,7 @@ function LoginContent() {
                   type="text" // Changé de 'email' à 'text' pour accepter les pseudos sans '@' lors du login
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                  className="w-full pl-11 pr-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                   placeholder={isLogin ? "Ton email ou ton pseudo" : "toi@exemple.com"}
                   required
                 />
@@ -145,7 +145,7 @@ function LoginContent() {
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                  className="w-full pl-11 pr-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                   placeholder="••••••••"
                   required
                   minLength={6}
