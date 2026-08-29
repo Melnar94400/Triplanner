@@ -178,12 +178,12 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6 my-8">
         <div className="flex justify-between items-center mb-2">
-          <button onClick={() => router.push('/')} className="text-gray-400 hover:text-indigo-600 flex items-center gap-1 text-sm font-bold transition-colors">
+          <button onClick={() => router.push('/')} className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-sm font-bold transition-colors">
             <ChevronLeft size={16} /> Retour
           </button>
           <button 
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-            className="text-gray-400 hover:text-indigo-600 flex items-center gap-1 text-sm font-bold transition-colors"
+            className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-sm font-bold transition-colors"
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} Thème
           </button>
@@ -195,7 +195,7 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-black text-gray-800 text-center">Mon Profil</h1>
 
         <div className="flex flex-col items-center relative">
-          <div className="w-24 h-24 rounded-full bg-indigo-50 border-4 border-white shadow-md flex items-center justify-center text-4xl overflow-hidden relative group">
+          <div className="w-24 h-24 rounded-full bg-primary-50 border-4 border-white shadow-md flex items-center justify-center text-4xl overflow-hidden relative group">
             {avatar.startsWith('http') ? (
               <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
@@ -213,9 +213,9 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Mon prénom / Pseudo</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2">
+          <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer le profil
           </button>
         </div>
@@ -225,7 +225,7 @@ export default function ProfilePage() {
         {/* SECTION SÉCURITÉ / MOT DE PASSE */}
         <div className="space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Lock size={16} className="text-indigo-600" /> Sécurité
+            <Lock size={16} className="text-primary-600" /> Sécurité
           </h3>
 
           {passwordMessage && (
@@ -242,7 +242,7 @@ export default function ProfilePage() {
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
@@ -310,10 +310,10 @@ export default function ProfilePage() {
           </div>
           <div className="bg-white p-6 pb-safe rounded-t-3xl flex flex-col items-center gap-4">
             <h3 className="font-bold text-gray-800">Ajuster la photo</h3>
-            <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full max-w-xs accent-indigo-600" />
+            <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full max-w-xs accent-primary-600" />
             <div className="flex gap-3 w-full max-w-xs mt-2">
               <button onClick={() => setImageSrc(null)} className="flex-1 py-3 font-bold text-gray-500 bg-gray-100 rounded-xl">Annuler</button>
-              <button onClick={handleCropSave} disabled={saving} className="flex-1 py-3 font-bold text-white bg-indigo-600 rounded-xl shadow-md">{saving ? '...' : 'Valider'}</button>
+              <button onClick={handleCropSave} disabled={saving} className="flex-1 py-3 font-bold text-white bg-primary-600 rounded-xl shadow-md">{saving ? '...' : 'Valider'}</button>
             </div>
           </div>
         </div>

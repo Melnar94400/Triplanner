@@ -79,12 +79,12 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="bg-indigo-600 p-8 text-center">
+        <div className="bg-primary-600 p-8 text-center">
           <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
             <Compass size={32} className="text-white" />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight mb-2">TripPlanner</h1>
-          <p className="text-indigo-100 font-medium text-sm">
+          <p className="text-primary-100 font-medium text-sm">
             {isLogin ? "Ravi de te revoir !" : "Rejoins l'aventure."}
           </p>
         </div>
@@ -108,7 +108,7 @@ function LoginContent() {
                     type="text" 
                     value={pseudo}
                     onChange={(e) => setPseudo(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                     placeholder="Ton pseudo (unique)"
                     required={!isLogin}
                   />
@@ -128,7 +128,7 @@ function LoginContent() {
                   type="text" // Changé de 'email' à 'text' pour accepter les pseudos sans '@' lors du login
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                   placeholder={isLogin ? "Ton email ou ton pseudo" : "toi@exemple.com"}
                   required
                 />
@@ -145,7 +145,7 @@ function LoginContent() {
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
+                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-medium text-gray-900"
                   placeholder="••••••••"
                   required
                   minLength={6}
@@ -156,7 +156,7 @@ function LoginContent() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-4"
+              className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-4"
             >
               {loading ? <Loader2 size={18} className="animate-spin" /> : null}
               {isLogin ? 'Se connecter' : 'Créer mon compte'}
@@ -166,7 +166,7 @@ function LoginContent() {
           <div className="mt-6 text-center">
             <button 
               onClick={() => { setIsLogin(!isLogin); setError(null); }}
-              className="text-sm font-semibold text-gray-500 hover:text-indigo-600 transition-colors"
+              className="text-sm font-semibold text-gray-500 hover:text-primary-600 transition-colors"
             >
               {isLogin ? "Pas encore de compte ? S'inscrire" : "Déjà un compte ? Se connecter"}
             </button>
