@@ -9,7 +9,7 @@ import {
   Calendar, MapPin, Users, Utensils, ShoppingBag, PieChart,
   Plus, Check, X, Pencil, Trash2, ArrowRight, Compass, Loader2, ChevronLeft,
   Star, ExternalLink, CalendarDays, Camera, ChevronRight, Play, Copy,
-  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target, Train, Plane, Backpack, Download
+  Home, Lock, Unlock, Map as MapIcon, Car, CloudSun, Target, Train, Plane, Backpack, Download, LogIn, LogOut
 } from 'lucide-react'
 import EXIF from 'exif-js'
 
@@ -22,8 +22,19 @@ type Activity = { id: string | number; title: string; description: string; price
 type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
 type PendingMedia = { id: string; file: File; preview: string; day: string; time_slot: string; };
 
-// Types Logistique
-type Transport = { id: string; user_id: string; mode: string; coming_from: string; arrival_time: string; seats_available: number; };
+type Transport = { 
+  id: string; 
+  user_id: string; 
+  mode: string; 
+  coming_from: string; 
+  arrival_day: string;
+  arrival_slot: string;
+  arrival_time: string; 
+  departure_day: string;
+  departure_slot: string;
+  departure_time: string;
+  seats_available: number; 
+};
 type Equipment = { id: string; name: string; assignee_id: string | null; };
 
 const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi (Arrivée)': 'bg-orange-100 text-orange-700', 'Samedi (Départ)': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
@@ -61,7 +72,7 @@ export default function TripPage() {
   // Dico Global
   const [globalDictionary, setGlobalDictionary] = useState<Record<string, string>>({})
 
-  // Destination & Planning
+  // Destination
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
   const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
@@ -138,7 +149,17 @@ export default function TripPage() {
 
   // Transports & Equipment (LOGISTIQUE)
   const [transports, setTransports] = useState<Transport[]>([])
-  const [myTransport, setMyTransport] = useState<Partial<Transport>>({ mode: 'Voiture', coming_from: '', arrival_time: '', seats_available: 0 })
+  const [myTransport, setMyTransport] = useState<Partial<Transport>>({ 
+    mode: 'Voiture', 
+    coming_from: '', 
+    arrival_day: 'Samedi (Arrivée)', 
+    arrival_slot: 'Après-midi', 
+    arrival_time: '', 
+    departure_day: 'Samedi (Départ)', 
+    departure_slot: 'Matin', 
+    departure_time: '', 
+    seats_available: 0 
+  })
   const [isEditingTransport, setIsEditingTransport] = useState(false)
   const [equipments, setEquipments] = useState<Equipment[]>([])
   const [newEquipment, setNewEquipment] = useState('')
@@ -279,7 +300,17 @@ export default function TripPage() {
       if (tData) {
         setTransports(tData)
         const mine = tData.find((t:any) => t.user_id === session.user.id)
-        if (mine) setMyTransport({ mode: mine.mode, coming_from: mine.coming_from, arrival_time: mine.arrival_time, seats_available: mine.seats_available })
+        if (mine) setMyTransport({ 
+          mode: mine.mode, 
+          coming_from: mine.coming_from, 
+          arrival_day: mine.arrival_day || 'Samedi (Arrivée)',
+          arrival_slot: mine.arrival_slot || 'Après-midi',
+          arrival_time: mine.arrival_time || '', 
+          departure_day: mine.departure_day || 'Samedi (Départ)',
+          departure_slot: mine.departure_slot || 'Matin',
+          departure_time: mine.departure_time || '',
+          seats_available: mine.seats_available 
+        })
       }
 
       const { data: eData } = await supabase.from('equipment_items').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
@@ -347,20 +378,13 @@ export default function TripPage() {
     setIsEditingTransport(false);
     fetchTripData();
   }
-const handleAddEquipment = async (e: React.FormEvent) => {
+  const handleAddEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEquipment.trim() || !currentUser) return;
-    
-    // On ajoute directement le currentUser.id comme assignee_id
-    await supabase.from('equipment_items').insert([{ 
-      trip_id: tripId, 
-      name: newEquipment.trim(),
-      assignee_id: currentUser.id 
-    }]);
-    
+    await supabase.from('equipment_items').insert([{ trip_id: tripId, name: newEquipment.trim(), assignee_id: currentUser.id }]);
     setNewEquipment(''); fetchTripData();
   }
-      const toggleEquipmentAssign = async (eq: Equipment) => {
+  const toggleEquipmentAssign = async (eq: Equipment) => {
     const newAssignee = eq.assignee_id === currentUser.id ? null : currentUser.id;
     await supabase.from('equipment_items').update({ assignee_id: newAssignee }).eq('id', eq.id);
     fetchTripData();
@@ -810,26 +834,30 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                     </div>
                   </div>
 
-                  {/* NOUVEAUX MODULES LOGISTIQUES */}
+                  {/* MODULES LOGISTIQUES : TRANSPORTS & MATÉRIEL */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
-                    {/* MODULE 1: TRANSPORTS */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4"><Car size={20} className="text-primary-600"/> Transports & Arrivées</h3>
+                    {/* MODULE 1: TRANSPORTS & ARRIVÉES/DÉPARTS */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col">
+                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4"><Car size={20} className="text-primary-600"/> Arrivées & Départs</h3>
                       
-                      <div className="space-y-3 mb-6">
+                      <div className="space-y-3 mb-6 flex-1">
                         {transports.filter(t => t.user_id !== currentUser?.id).map(t => (
-                          <div key={t.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shrink-0 border border-primary-200">
-                              {getTransportIcon(t.mode)}
+                          <div key={t.id} className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 font-bold text-sm text-gray-800">
+                                {getTransportIcon(t.mode)}
+                                <span>{getMember(t.user_id)?.name}</span>
+                              </div>
+                              {t.seats_available > 0 && <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">{t.seats_available} place(s)</span>}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-sm text-gray-800 flex items-center gap-2">{getMember(t.user_id)?.name} {t.seats_available > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{t.seats_available} places</span>}</div>
-                              <div className="text-xs text-gray-500 truncate">De {t.coming_from || '?'} • Arrive à {t.arrival_time || '?'}</div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 bg-white/70 p-2.5 rounded-xl border border-gray-100">
+                              <div><span className="font-bold text-emerald-600 flex items-center gap-1"><LogIn size={12}/> Arrivée :</span> {t.arrival_day} • {t.arrival_slot} {t.arrival_time && `(${t.arrival_time})`}</div>
+                              <div><span className="font-bold text-amber-600 flex items-center gap-1"><LogOut size={12}/> Départ :</span> {t.departure_day} • {t.departure_slot} {t.departure_time && `(${t.departure_time})`}</div>
                             </div>
                           </div>
                         ))}
-                        {transports.length === 0 && <div className="text-sm text-gray-400 italic">Personne n'a encore indiqué son transport.</div>}
+                        {transports.length === 0 && <div className="text-sm text-gray-400 italic">Personne n'a encore renseigné son trajet.</div>}
                       </div>
 
                       <div className="border-t pt-4">
@@ -839,18 +867,47 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                         </div>
                         
                         {isEditingTransport ? (
-                          <form onSubmit={handleSaveTransport} className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                          <form onSubmit={handleSaveTransport} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
                             <div className="grid grid-cols-2 gap-2">
-                              <select value={myTransport.mode} onChange={e => setMyTransport({...myTransport, mode: e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none">
-                                <option>Voiture</option><option>Train</option><option>Avion</option><option>Covoiturage</option><option>Moto</option>
+                              <select value={myTransport.mode} onChange={e => setMyTransport({...myTransport, mode: e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2 text-xs bg-white outline-none">
+                                <option>Voiture</option><option>Train</option><option>Avion</option><option>Covoiturage</option><option>Moto</option><option>Vélo</option>
                               </select>
-                              <input type="text" value={myTransport.arrival_time} onChange={e => setMyTransport({...myTransport, arrival_time: e.target.value})} placeholder="Heure d'arrivée" className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none" />
+                              <input type="text" value={myTransport.coming_from} onChange={e => setMyTransport({...myTransport, coming_from: e.target.value})} placeholder="Départ de (Ville)" className="border border-gray-200 rounded-xl px-3 py-2 text-xs bg-white outline-none" />
                             </div>
-                            <input type="text" value={myTransport.coming_from} onChange={e => setMyTransport({...myTransport, coming_from: e.target.value})} placeholder="Départ de (Ville)" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none" />
-                            <div className="flex items-center gap-2">
+
+                            {/* Section Arrivée */}
+                            <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-2">
+                              <span className="text-xs font-bold text-emerald-700 flex items-center gap-1"><LogIn size={12}/> Mon Arrivée</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <select value={myTransport.arrival_day} onChange={e => setMyTransport({...myTransport, arrival_day: e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none">
+                                  {WEEK_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <select value={myTransport.arrival_slot} onChange={e => setMyTransport({...myTransport, arrival_slot: e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none">
+                                  {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                              <input type="text" value={myTransport.arrival_time} onChange={e => setMyTransport({...myTransport, arrival_time: e.target.value})} placeholder="Heure exacte (Ex: 16h30)" className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none" />
+                            </div>
+
+                            {/* Section Départ */}
+                            <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-2">
+                              <span className="text-xs font-bold text-amber-700 flex items-center gap-1"><LogOut size={12}/> Mon Départ</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <select value={myTransport.departure_day} onChange={e => setMyTransport({...myTransport, departure_day: e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none">
+                                  {WEEK_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <select value={myTransport.departure_slot} onChange={e => setMyTransport({...myTransport, departure_slot: e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none">
+                                  {['Matin', 'Déjeuner', 'Après-midi', 'Dîner', 'Soirée'].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                              <input type="text" value={myTransport.departure_time} onChange={e => setMyTransport({...myTransport, departure_time: e.target.value})} placeholder="Heure exacte (Ex: 10h00)" className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none" />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
                               <label className="text-xs text-gray-500 font-bold">Places libres :</label>
-                              <input type="number" value={myTransport.seats_available} onChange={e => setMyTransport({...myTransport, seats_available: Number(e.target.value)})} className="w-16 border border-gray-200 rounded-xl px-2 py-1.5 text-sm bg-white text-center outline-none" />
+                              <input type="number" value={myTransport.seats_available} onChange={e => setMyTransport({...myTransport, seats_available: Number(e.target.value)})} className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white text-center outline-none" />
                             </div>
+
                             <div className="flex gap-2 pt-2">
                               <button type="button" onClick={() => setIsEditingTransport(false)} className="flex-1 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl">Annuler</button>
                               <button type="submit" className="flex-1 py-2 text-xs font-bold text-white bg-primary-600 rounded-xl shadow-sm">Valider</button>
@@ -858,28 +915,32 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                           </form>
                         ) : (
                           transports.some(t => t.user_id === currentUser?.id) ? (
-                            <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-xl border border-primary-100">
-                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary-600 shrink-0 shadow-sm">
-                                {getTransportIcon(myTransport.mode || 'Voiture')}
+                            <div className="p-3.5 bg-primary-50 rounded-2xl border border-primary-100 flex flex-col gap-2">
+                              <div className="flex items-center justify-between">
+                                <div className="font-bold text-sm text-primary-900 flex items-center gap-2">
+                                  {getTransportIcon(myTransport.mode || 'Voiture')}
+                                  <span>En {myTransport.mode}</span>
+                                </div>
+                                {myTransport.seats_available ? <span className="text-[10px] bg-primary-200 text-primary-800 font-bold px-2 py-0.5 rounded-full">+{myTransport.seats_available} places</span> : ''}
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-bold text-sm text-primary-800">En {myTransport.mode} {myTransport.seats_available ? <span className="text-[10px] ml-1 bg-primary-200 text-primary-800 px-1.5 py-0.5 rounded">+{myTransport.seats_available} places</span> : ''}</div>
-                                <div className="text-xs text-primary-600 truncate">Depuis {myTransport.coming_from} • À {myTransport.arrival_time}</div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-primary-800 bg-white/70 p-2.5 rounded-xl border border-primary-100">
+                                <div><span className="font-bold text-emerald-700 flex items-center gap-1"><LogIn size={12}/> Arrivée :</span> {myTransport.arrival_day} • {myTransport.arrival_slot} {myTransport.arrival_time && `(${myTransport.arrival_time})`}</div>
+                                <div><span className="font-bold text-amber-700 flex items-center gap-1"><LogOut size={12}/> Départ :</span> {myTransport.departure_day} • {myTransport.departure_slot} {myTransport.departure_time && `(${myTransport.departure_time})`}</div>
                               </div>
                             </div>
                           ) : (
-                            <div className="text-xs text-orange-600 bg-orange-50 border border-orange-100 p-3 rounded-xl">Tu n'as pas encore indiqué comment tu venais !</div>
+                            <div className="text-xs text-orange-600 bg-orange-50 border border-orange-100 p-3 rounded-xl">Tu n'as pas encore indiqué tes dates d'arrivée et de départ !</div>
                           )
                         )}
                       </div>
                     </div>
 
                     {/* MODULE 2: QUI AMÈNE QUOI */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-4"><Backpack size={20} className="text-primary-600"/> Matériel partagé</h3>
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col">
+                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-2"><Backpack size={20} className="text-primary-600"/> Matériel partagé</h3>
                       <p className="text-xs text-gray-500 mb-4">Jeux de société, enceinte, appareil à raclette... Évitons les doublons !</p>
                       
-                      <div className="space-y-2 mb-4 max-h-[40vh] overflow-y-auto pr-1">
+                      <div className="space-y-2 mb-4 max-h-[40vh] overflow-y-auto pr-1 flex-1">
                         {equipments.map(eq => (
                           <div key={eq.id} onClick={() => toggleEquipmentAssign(eq)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer group transition-colors ${eq.assignee_id ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-primary-50'}`}>
                             <div className="flex items-center gap-3">
@@ -926,7 +987,7 @@ const handleAddEquipment = async (e: React.FormEvent) => {
             </div>
           )}
           
-          {/* PLANNING */}
+          {/* PLANNING (AVEC AFFICHAGE DES ARRIVÉES ET DÉPARTS DANS LES CRÉNEAUX) */}
           {activeTab === 'calendar' && (
             <div className="max-w-5xl mx-auto space-y-6">
               <h2 className="text-2xl font-bold text-gray-800">Planning de la semaine</h2>
@@ -973,6 +1034,10 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                       const slotMeals = meals.filter(m => m.day === day && m.type === slot);
                       const slotActivities = activities.filter(a => a.day === day && (a.timeSlot === slot || (a.timeSlot === 'Journée entière' && ['Matin', 'Déjeuner', 'Après-midi'].includes(slot))));
                       
+                      // Filtrage des arrivées et départs pour ce créneau
+                      const slotArrivals = transports.filter(t => (t.arrival_day || 'Samedi (Arrivée)') === day && (t.arrival_slot || 'Après-midi') === slot);
+                      const slotDepartures = transports.filter(t => (t.departure_day || 'Samedi (Départ)') === day && (t.departure_slot || 'Matin') === slot);
+
                       return (
                         <div key={slot} className="p-4 flex flex-col md:flex-row md:items-start gap-4 hover:bg-gray-50/30 transition-colors">
                           <div className="w-32 flex-shrink-0 flex flex-col gap-2">
@@ -1008,20 +1073,65 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                               );
                             })()}
                           </div>
+                          
                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {slotMeals.map(meal => (
-                              <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}><div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div><div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div><div className="font-bold text-gray-800 text-sm">{meal.name}</div></div>
+                            
+                            {/* BADGES ARRIVÉES */}
+                            {slotArrivals.map(t => (
+                              <div key={`arr-${t.id}`} className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-center">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                                <div className="text-[10px] font-black text-emerald-700 uppercase mb-0.5 flex items-center gap-1">
+                                  <LogIn size={11}/> Arrivée
+                                </div>
+                                <div className="font-bold text-emerald-950 text-sm flex items-center gap-1.5">
+                                  <span>{getMember(t.user_id)?.name}</span>
+                                  {t.mode && <span className="text-xs font-normal text-emerald-700">({t.mode})</span>}
+                                </div>
+                                {t.arrival_time && <div className="text-[11px] text-emerald-600 font-medium">À {t.arrival_time}</div>}
+                              </div>
                             ))}
+
+                            {/* BADGES DÉPARTS */}
+                            {slotDepartures.map(t => (
+                              <div key={`dep-${t.id}`} className="bg-amber-50/70 border border-amber-200 p-3 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-center">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500"></div>
+                                <div className="text-[10px] font-black text-amber-700 uppercase mb-0.5 flex items-center gap-1">
+                                  <LogOut size={11}/> Départ
+                                </div>
+                                <div className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                                  <span>{getMember(t.user_id)?.name}</span>
+                                  {t.mode && <span className="text-xs font-normal text-amber-700">({t.mode})</span>}
+                                </div>
+                                {t.departure_time && <div className="text-[11px] text-amber-600 font-medium">À {t.departure_time}</div>}
+                              </div>
+                            ))}
+
+                            {/* REPAS */}
+                            {slotMeals.map(meal => (
+                              <div key={`meal-${meal.id}`} className="bg-orange-50/50 border border-orange-100 p-3 rounded-xl shadow-sm relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('meals')}>
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div>
+                                <div className="text-[10px] font-black text-orange-600 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Repas</div>
+                                <div className="font-bold text-gray-800 text-sm">{meal.name}</div>
+                              </div>
+                            ))}
+
+                            {/* ACTIVITÉS */}
                             {slotActivities.map(act => (
                               <div key={`act-${act.id}`} className="bg-primary-50/50 border border-primary-100 p-3 rounded-xl shadow-sm relative overflow-hidden group">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500"></div>
                                 <div className="flex justify-between items-start">
-                                  <div className="cursor-pointer" onClick={() => setActiveTab('activities')}><div className="text-[10px] font-black text-primary-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div><div className="font-bold text-gray-800 text-sm">{act.title}</div></div>
+                                  <div className="cursor-pointer" onClick={() => setActiveTab('activities')}>
+                                    <div className="text-[10px] font-black text-primary-600 uppercase mb-1 flex items-center gap-1"><Compass size={10} /> {act.timeSlot === 'Journée entière' ? 'Activité longue' : 'Activité'}</div>
+                                    <div className="font-bold text-gray-800 text-sm">{act.title}</div>
+                                  </div>
                                 </div>
                                 {act.durationFromAcc && <div className="mt-2 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-1.5 py-0.5 rounded flex items-center gap-1"><Car size={10}/> {act.durationFromAcc}</div>}
                               </div>
                             ))}
-                            {slotMeals.length === 0 && slotActivities.length === 0 && <div className="text-gray-300 text-sm font-medium italic">Quartier libre...</div>}
+
+                            {slotMeals.length === 0 && slotActivities.length === 0 && slotArrivals.length === 0 && slotDepartures.length === 0 && (
+                              <div className="text-gray-300 text-sm font-medium italic">Quartier libre...</div>
+                            )}
                           </div>
                         </div>
                       )
@@ -1093,7 +1203,7 @@ const handleAddEquipment = async (e: React.FormEvent) => {
             </div>
           )}
 
-          {/* REPAS & COURSES AVEC CATÉGORIES ET SÉLECTEURS */}
+          {/* REPAS & COURSES */}
           {activeTab === 'meals' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="flex-1 space-y-6">
@@ -1136,7 +1246,6 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* LISTE DE COURSES AVEC SÉLECTEUR DE CATÉGORIE EN LIGNE */}
               <div className="w-full lg:w-96">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
                   <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-primary-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
@@ -1189,7 +1298,6 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* FORMULAIRE D'AJOUT DE REPAS AVEC GESTION DU BOUTON ENTRÉE */}
               {showMealForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                   <div className="bg-white w-full max-w-md rounded-2xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1238,7 +1346,7 @@ const handleAddEquipment = async (e: React.FormEvent) => {
             </div>
           )}
 
-          {/* COMPTES / DÉPENSES */}
+          {/* COMPTES */}
           {activeTab === 'expenses' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="w-full lg:w-1/3 space-y-6">
@@ -1371,7 +1479,6 @@ const handleAddEquipment = async (e: React.FormEvent) => {
                         </div>
                       )}
 
-                      {/* OVERLAY DE SÉLECTION */}
                       {isSelectionMode && (
                         <div className="absolute top-2 left-2 z-20">
                           <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedMediaIds.has(media.id) ? 'bg-primary-500 border-primary-500 text-white' : 'bg-black/30 border-white text-transparent'}`}>
