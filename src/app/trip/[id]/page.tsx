@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import EXIF from 'exif-js'
 
-// Import dynamique de la carte pour éviter l'erreur "window is not defined" côté serveur
 const MapView = dynamic(() => import('./MapView'), { ssr: false })
 
 type Meal = { id: string | number; day: string; type: string; name: string; starter?: string; dessert?: string; drinks?: string; recipeLink?: string; cooks: string[]; ingredients: { name: string; qty: string }[]; };
@@ -26,15 +25,20 @@ type PendingMedia = { id: string; file: File; preview: string; day: string; time
 
 const DAY_COLORS: Record<string, string> = { 'Lundi': 'bg-blue-100 text-blue-700', 'Mardi': 'bg-emerald-100 text-emerald-700', 'Mercredi': 'bg-yellow-100 text-yellow-700', 'Jeudi': 'bg-purple-100 text-purple-700', 'Vendredi': 'bg-pink-100 text-pink-700', 'Samedi (Arrivée)': 'bg-orange-100 text-orange-700', 'Samedi (Départ)': 'bg-orange-100 text-orange-700', 'Dimanche': 'bg-red-100 text-red-700' };
 const WEEK_DAYS = ['Samedi (Arrivée)', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi (Départ)'];
+const DAY_ORDER: Record<string, number> = { 'Samedi (Arrivée)': 1, 'Dimanche': 2, 'Lundi': 3, 'Mardi': 4, 'Mercredi': 5, 'Jeudi': 6, 'Vendredi': 7, 'Samedi (Départ)': 8 };
+const SLOT_ORDER: Record<string, number> = { 'Matin': 1, 'Déjeuner': 2, 'Après-midi': 3, 'Dîner': 4, 'Soirée': 5 };
 
-const DAY_ORDER: Record<string, number> = {
-  'Samedi (Arrivée)': 1, 'Dimanche': 2, 'Lundi': 3, 'Mardi': 4, 
-  'Mercredi': 5, 'Jeudi': 6, 'Vendredi': 7, 'Samedi (Départ)': 8
-};
-
-const SLOT_ORDER: Record<string, number> = {
-  'Matin': 1, 'Déjeuner': 2, 'Après-midi': 3, 'Dîner': 4, 'Soirée': 5
-};
+// --- CATÉGORIES POUR LA LISTE DE COURSES ---
+const SHOPPING_CATEGORIES = ['Fruits & Légumes', 'Viandes & Poissons', 'Frais & Laitier', 'Épicerie', 'Boissons', 'Divers'];
+const guessCategory = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.match(/pomme|banane|salade|tomate|carotte|oignon|ail|poivron|courgette|citron|fruit|légume|patate|pommes de terre/)) return 'Fruits & Légumes';
+  if (n.match(/poulet|boeuf|viande|poisson|saumon|porc|saucisse|lardons|jambon|dinde/)) return 'Viandes & Poissons';
+  if (n.match(/lait|beurre|crème|fromage|oeuf|yaourt|mozzarella|feta|gruyère/)) return 'Frais & Laitier';
+  if (n.match(/eau|vin|bière|jus|coca|soda|café|thé/)) return 'Boissons';
+  if (n.match(/pâte|riz|farine|sucre|sel|poivre|huile|vinaigre|moutarde|épice|chocolat|pain/)) return 'Épicerie';
+  return 'Divers';
+}
 
 export default function TripPage() {
   const params = useParams()
@@ -50,17 +54,16 @@ export default function TripPage() {
   const [settlements, setSettlements] = useState<any[]>([])
   const [weather, setWeather] = useState<any[] | null>(null)
   const [showMembersModal, setShowMembersModal] = useState(false);
+
   // Destination States
   const [proposedWeeks, setProposedWeeks] = useState<any[]>([])
   const [proposedRegions, setProposedRegions] = useState<any[]>([])
   const [proposedPlaces, setProposedPlaces] = useState<any[]>([])
-  
-const [newWeek, setNewWeek] = useState('')
+  const [newWeek, setNewWeek] = useState('')
   const [editingWeekId, setEditingWeekId] = useState<string | null>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Générateur automatique de la phrase "Du X au Y Mois"
   useEffect(() => {
     if (startDate && endDate) {
       const start = new Date(startDate)
@@ -69,21 +72,17 @@ const [newWeek, setNewWeek] = useState('')
       const endDay = end.getDate()
       const startMonth = start.toLocaleDateString('fr-FR', { month: 'long' })
       const endMonth = end.toLocaleDateString('fr-FR', { month: 'long' })
-
-      if (startMonth === endMonth) {
-        setNewWeek(`Du ${startDay} au ${endDay} ${startMonth}`)
-      } else {
-        setNewWeek(`Du ${startDay} ${startMonth} au ${endDay} ${endMonth}`)
-      }
+      if (startMonth === endMonth) setNewWeek(`Du ${startDay} au ${endDay} ${startMonth}`)
+      else setNewWeek(`Du ${startDay} ${startMonth} au ${endDay} ${endMonth}`)
     }
   }, [startDate, endDate])
+
   const [newRegion, setNewRegion] = useState('')
   const [editingRegionId, setEditingRegionId] = useState<string | null>(null)
-  
   const [showPlaceForm, setShowPlaceForm] = useState(false)
   const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({ name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null as number|null, lng: null as number|null })  
-  
+
   // Lock States
   const [lockWeek, setLockWeek] = useState('')
   const [lockRegion, setLockRegion] = useState('')
@@ -104,11 +103,14 @@ const [newWeek, setNewWeek] = useState('')
   const [mealRecipeLink, setMealRecipeLink] = useState('')
   const [mealCooks, setMealCooks] = useState<string[]>([])
   const [mealIngredients, setMealIngredients] = useState<{name: string, qty: string}[]>([])
-  
+
   // Extra Shopping
   const [extraItems, setExtraItems] = useState<{id: string, name: string, qty: string}[]>([])
   const [newExtraItem, setNewExtraItem] = useState('')
   const [newExtraQty, setNewExtraQty] = useState('')
+  
+  // Datalist extraction
+  const allIngredients = Array.from(new Set(meals.flatMap(m => m.ingredients?.map((i: any) => i.name) || []))).sort();
 
   // Activities States
   const [activities, setActivities] = useState<Activity[]>([])
@@ -155,7 +157,6 @@ const [newWeek, setNewWeek] = useState('')
 
   useEffect(() => {
     fetchTripData()
-
     const channel = supabase.channel('trip_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_weeks' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proposed_regions' }, () => { fetchTripData() })
@@ -169,7 +170,6 @@ const [newWeek, setNewWeek] = useState('')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'media' }, () => { fetchTripData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => { fetchTripData() })
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
   }, [tripId])
 
@@ -202,13 +202,13 @@ const [newWeek, setNewWeek] = useState('')
       if (tripError) throw tripError
       setTrip(tripData)
 
-const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+      const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
       if (wData) setProposedWeeks(wData.map((w:any) => ({id: w.id, text: w.week_text, votes: w.votes || [], by: w.proposed_by})))
 
-const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+      const { data: rData } = await supabase.from('proposed_regions').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
         if (rData) setProposedRegions(rData.map((r:any) => ({id: r.id, name: r.name, ratings: r.ratings || {}, by: r.proposed_by})))
 
-const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
+      const { data: pData } = await supabase.from('proposed_places').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
           if (pData) setProposedPlaces(pData.map((p:any) => ({id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, beds: p.beds, amenities: p.amenities, link: p.link, ratings: p.ratings || {}, by: p.proposed_by})))
       
       const { data: settlementsData } = await supabase.from('settlements').select('*').eq('trip_id', tripId)
@@ -256,16 +256,16 @@ const { data: pData } = await supabase.from('proposed_places').select('*').eq('t
   // --- GESTION DESTINATION (PROPOSITIONS & VÉROUILLAGE) ---
   const isAdmin = members.find(m => m.id === currentUser?.id)?.role === 'admin'
   const isLocked = trip?.is_planning_locked
-const handleRemoveMember = async (memberId: string) => {
-  if (!confirm("Voulez-vous vraiment retirer cette personne du voyage ?")) return;
-  try {
-    await supabase.from('trip_members').delete().eq('trip_id', tripId).eq('user_id', memberId);
-    fetchTripData();
-  } catch (err: any) {
-    alert(err.message);
-  }
-};
-const handleSaveWeek = async (e?: React.FormEvent) => {
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm("Voulez-vous vraiment retirer cette personne du voyage ?")) return;
+    try {
+      await supabase.from('trip_members').delete().eq('trip_id', tripId).eq('user_id', memberId);
+      fetchTripData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+  const handleSaveWeek = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
     if(!newWeek.trim()) return;
     if (editingWeekId) {
@@ -279,7 +279,7 @@ const handleSaveWeek = async (e?: React.FormEvent) => {
 
   const startEditWeek = (w: any) => { setEditingWeekId(w.id); setNewWeek(w.text); setStartDate(''); setEndDate(''); }
   const handleDeleteWeek = async (id: string) => { if(confirm("Supprimer cette date ?")) { await supabase.from('proposed_weeks').delete().eq('id', id); fetchTripData(); } }
-const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
+  const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
     if(!currentUser) return;
     const newVotes = currentVotes.includes(currentUser.id) ? currentVotes.filter(id => id !== currentUser.id) : [...currentVotes, currentUser.id];
     setProposedWeeks(prev => prev.map(w => w.id === weekId ? {...w, votes: newVotes} : w));
@@ -341,7 +341,6 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
     await supabase.from('proposed_places').update({votes: newVotes}).eq('id', placeId);
   }
 
-  // --- GESTION DU CONSENSUS ---
   const getRatingStats = (ratings: Record<string, number>) => { 
     const scores = Object.values(ratings); 
     if (scores.length === 0) return { avg: 0, sd: 0, consensus: 0 }; 
@@ -402,7 +401,8 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
   const resetMealForm = () => { setEditingMealId(null); setMealDay('Samedi (Arrivée)'); setMealType('Déjeuner'); setMealName(''); setMealStarter(''); setMealDessert(''); setMealDrinks(''); setMealRecipeLink(''); setMealCooks([]); setMealIngredients([{ name: '', qty: '' }]); setShowMealForm(false); };
   const editMeal = (meal: Meal) => { setEditingMealId(meal.id); setMealDay(meal.day); setMealType(meal.type); setMealName(meal.name || ''); setMealStarter(meal.starter || ''); setMealDessert(meal.dessert || ''); setMealDrinks(meal.drinks || ''); setMealRecipeLink(meal.recipeLink || ''); setMealCooks(meal.cooks || []); setMealIngredients(meal.ingredients?.length ? meal.ingredients : [{ name: '', qty: '' }]); setShowMealForm(true); };
   
-  const handleSaveMeal = async () => { 
+  const handleSaveMeal = async (e?: React.FormEvent) => { 
+    if (e) e.preventDefault();
     if (!mealName.trim()) return; 
     const mealPayload = { trip_id: tripId, day: mealDay, type: mealType, name: mealName.trim(), starter: mealStarter.trim() || null, dessert: mealDessert.trim() || null, drinks: mealDrinks.trim() || null, recipe_link: mealRecipeLink.trim() || null }; 
     let currentMealId = editingMealId; 
@@ -428,13 +428,13 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
       meal.ingredients?.forEach(ing => {
         if (!ing.name) return
         const key = ing.name.toLowerCase().trim(); const tagText = `${meal.day.substring(0,3)}. ${meal.type === 'Déjeuner' ? 'Midi' : 'Soir'}`; const tagColor = DAY_COLORS[meal.day] || 'bg-gray-100 text-gray-700';
-        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }] }
+        if (!list[key]) list[key] = { id: key, name: ing.name, qtys: ing.qty ? [ing.qty] : [], tags: [{ text: tagText, color: tagColor }], category: guessCategory(ing.name) }
         else { if (ing.qty && !list[key].qtys.includes(ing.qty)) list[key].qtys.push(ing.qty); if (!list[key].tags.some((t: any) => t.text === tagText)) list[key].tags.push({ text: tagText, color: tagColor }) }
       })
     })
     extraItems.forEach(item => {
       const key = item.name.toLowerCase().trim();
-      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true }
+      if (!list[key]) list[key] = { id: key, dbId: item.id, name: item.name, qtys: item.qty ? [item.qty] : [], tags: [{ text: 'Général', color: 'bg-gray-200 text-gray-700' }], isExtra: true, category: guessCategory(item.name) }
       else { if (item.qty && !list[key].qtys.includes(item.qty)) list[key].qtys.push(item.qty); if (!list[key].tags.some((t: any) => t.text === 'Général')) list[key].tags.push({ text: 'Général', color: 'bg-gray-200 text-gray-700' }); list[key].isExtra = true; list[key].dbId = item.id; }
     });
     return Object.values(list).map(item => ({ ...item, displayQty: item.qtys.join(' + ') }))
@@ -601,7 +601,6 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
       })
     : mediaItems;
 
-
   if (loading && !trip) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 gap-2"><Loader2 size={24} className="animate-spin" /> Chargement...</div>
   if (error || !trip) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm">{error || "Introuvable"}</div><button onClick={() => router.push('/')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm">Retour</button></div>
 
@@ -621,12 +620,9 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
           >
             <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager le lien
           </button>
-          <button 
-  onClick={() => setShowMembersModal(true)} 
-  className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors shadow-sm w-fit"
->
-  <Users size={14} /> {members.length} participant(s)
-</button>        
+          <button onClick={() => setShowMembersModal(true)} className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors shadow-sm w-fit">
+            <Users size={14} /> {members.length} participant(s)
+          </button>        
         </div>
         
         <nav className="flex-1 px-4 space-y-2 mt-2">
@@ -648,7 +644,7 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
       </aside>
 
       <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-<div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
+        <div className="md:hidden p-4 bg-white border-b sticky top-0 z-10 flex items-center justify-between">
           <div>
             <button onClick={() => router.push('/')} className="text-xs text-gray-400 flex items-center gap-1 mb-1">
               <ChevronLeft size={12} /> Retour
@@ -663,17 +659,21 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
           </button>
         </div>
         <div className="flex gap-2">
-  <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"><Users size={16} /></button>
-  <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"><Users size={16} /></button>
-</div>
+          <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-100 transition-colors"><Users size={16} /></button>
+          <button onClick={() => router.push('/profile')} className="text-xs font-bold bg-gray-50 text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"><Users size={16} /></button>
+        </div>
+        
+        {/* === INJECTION DE LA DATALIST === */}
+        <datalist id="ingredients-list">
+          {allIngredients.map((ing, idx) => <option key={idx} value={ing} />)}
+        </datalist>
+
         <div className="p-4 md:p-8">
           
-          {/* ONGLET DESTINATION (PHASÉ) */}
+          {/* ONGLET DESTINATION */}
           {activeTab === 'destination' && (
             <div className="max-w-6xl mx-auto space-y-8">
-              
               {!trip.trip_region ? (
-                // ================= PHASE 1 : SEMAINE & RÉGION =================
                 <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 to-blue-500"></div>
                   <div className="mb-6">
@@ -682,47 +682,47 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-<div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-  <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
-  <div className="space-y-3 mb-4">
-{proposedWeeks.map(w => (
-        <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
-          {(isAdmin || w.by === currentUser?.id) && (
-            <>
-              <button onClick={() => startEditWeek(w)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button>
-              <button onClick={() => handleDeleteWeek(w.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button>
-            </>
-          )}
-        </div>
-        <div className="flex items-center justify-between pr-14">
-          <span className="font-semibold text-sm">{w.text}</span>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
-            <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-  <form onSubmit={handleSaveWeek} className="flex flex-col gap-2">
-    <div className="flex gap-2">
-      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de début" />
-      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de fin" />
-    </div>
-    <div className="flex gap-2">
-      <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Format libre (Ex: Mi-Août)" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
-      <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">
-        {editingWeekId ? <Check size={18}/> : <Plus size={18}/>}
-      </button>
-    </div>
-  </form>
-</div>
+                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Calendar size={18} className="text-indigo-600"/> La semaine</h3>
+                      <div className="space-y-3 mb-4">
+                        {proposedWeeks.map(w => (
+                          <div key={w.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border shadow-sm relative group">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
+                              {(isAdmin || w.by === currentUser?.id) && (
+                                <>
+                                  <button onClick={() => startEditWeek(w)} className="p-1 bg-white border rounded text-gray-400 hover:text-indigo-600 shadow-sm"><Pencil size={12}/></button>
+                                  <button onClick={() => handleDeleteWeek(w.id)} className="p-1 bg-white border rounded text-gray-400 hover:text-red-600 shadow-sm"><Trash2 size={12}/></button>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between pr-14">
+                              <span className="font-semibold text-sm">{w.text}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-gray-400">{w.votes.length} votes</span>
+                                <button onClick={() => toggleWeekVote(w.id, w.votes)} className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${w.votes.includes(currentUser?.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-indigo-600'}`}><Check size={16} /></button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <form onSubmit={handleSaveWeek} className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de début" />
+                          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1 px-2 py-2 text-xs border rounded-xl bg-white text-gray-600" title="Date de fin" />
+                        </div>
+                        <div className="flex gap-2">
+                          <input type="text" value={newWeek} onChange={e => setNewWeek(e.target.value)} placeholder="Format libre (Ex: Mi-Août)" className="flex-1 px-3 py-2 text-sm border rounded-xl" />
+                          <button type="submit" disabled={!newWeek.trim()} className="bg-indigo-600 text-white p-2 rounded-xl disabled:opacity-50 min-w-[36px] flex items-center justify-center">
+                            {editingWeekId ? <Check size={18}/> : <Plus size={18}/>}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                       <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4"><Compass size={18} className="text-indigo-600"/> La Zone Géo</h3>
                       <div className="space-y-3 mb-4">
-{proposedRegions.map(r => {
-                            const stats = getRatingStats(r.ratings);
+                        {proposedRegions.map(r => {
+                          const stats = getRatingStats(r.ratings);
                           return (
                             <div key={r.id} className="bg-white p-3 rounded-xl border shadow-sm flex flex-col gap-2 relative group">
                               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
@@ -768,7 +768,6 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                 </div>
 
               ) : !isLocked ? (
-                // ================= PHASE 2 : RECHERCHE DE GÎTES =================
                 <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500"></div>
                   
@@ -790,8 +789,8 @@ const toggleWeekVote = async (weekId: string, currentVotes: string[]) => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         {proposedPlaces.length === 0 ? <div className="text-sm text-gray-400 italic">Aucune proposition.</div> : 
-proposedPlaces.map(p => {
-                              const stats = getRatingStats(p.ratings);
+                          proposedPlaces.map(p => {
+                            const stats = getRatingStats(p.ratings);
                             return (
                               <div key={p.id} className="bg-white p-4 rounded-xl border shadow-sm relative group overflow-hidden">
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 z-10">
@@ -830,7 +829,8 @@ proposedPlaces.map(p => {
                     <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
                       <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Lock size={18} /> Sanctuariser le Gîte (Admin)</h3>
                       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-<select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
+                        <select value={lockPlaceId} onChange={e => setLockPlaceId(e.target.value)} className="flex-1 text-sm px-3 py-2 border rounded-xl bg-white"><option value="">-- Sélectionner le gîte final --</option>{proposedPlaces.map(p => <option key={p.id} value={p.id}>{p.name} (Score: {getRatingStats(p.ratings).consensus.toFixed(1)})</option>)}</select>
+                        <button onClick={handleLockPhase2} disabled={isLocking} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 disabled:opacity-50">Verrouiller le voyage</button>
                       </div>
                       <p className="text-xs text-indigo-500 font-medium">Le verrouillage débloquera l'accès au planning, repas, activités et comptes pour tout le groupe.</p>
                     </div>
@@ -840,7 +840,6 @@ proposedPlaces.map(p => {
                 </div>
 
               ) : (
-                // ================= PHASE 3 : VOYAGE VERROUILLÉ =================
                 <div className="space-y-6">
                   <div className="bg-white p-6 md:p-8 rounded-3xl border border-indigo-100 shadow-md relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
@@ -913,8 +912,7 @@ proposedPlaces.map(p => {
                 </div>
               )}
 
-<div className="space-y-4">
-                {/* --- NAVIGATION DES JOURS (ONGLETS) --- */}
+              <div className="space-y-4">
                 <div className="flex overflow-x-auto gap-2 pb-2 snap-x hide-scrollbar sticky top-[60px] md:top-0 z-10 bg-gray-50/95 backdrop-blur-sm pt-2 -mx-4 px-4 md:mx-0 md:px-0">
                   {WEEK_DAYS.map(day => (
                     <button
@@ -927,7 +925,6 @@ proposedPlaces.map(p => {
                   ))}
                 </div>
 
-                {/* --- CONTENU DU JOUR SÉLECTIONNÉ --- */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-50 flex items-center justify-between">
                     <span className="font-black text-indigo-800 text-lg uppercase tracking-tight">{selectedPlanningDay}</span>
@@ -993,7 +990,8 @@ proposedPlaces.map(p => {
                     })}
                   </div>
                 </div>
-              </div>            </div>
+              </div>
+            </div>
           )}
 
           {/* ACTIVITÉS */}
@@ -1057,7 +1055,7 @@ proposedPlaces.map(p => {
             </div>
           )}
 
-          {/* REPAS & COURSES */}
+          {/* REPAS & COURSES AVEC CATÉGORIES */}
           {activeTab === 'meals' && (
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="flex-1 space-y-6">
@@ -1079,7 +1077,7 @@ proposedPlaces.map(p => {
                                     <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-2"><button onClick={() => editMeal(meal)} className="p-1 border rounded bg-white text-gray-400 hover:text-indigo-600"><Pencil size={14}/></button><button onClick={() => handleDeleteMeal(meal.id)} className="p-1 border rounded bg-white text-gray-400 hover:text-red-600"><Trash2 size={14}/></button></div>
                                     <h3 className="font-bold text-lg mb-2">🍲 {meal.name} {meal.recipeLink && <a href={meal.recipeLink} target="_blank" className="text-indigo-500 text-xs"><ExternalLink size={10} className="inline"/></a>}</h3>
                                     <div className="text-sm text-gray-500 space-y-1 mb-3">{meal.starter && <div>🥗 {meal.starter}</div>} {meal.dessert && <div>🍰 {meal.dessert}</div>} {meal.drinks && <div>🥂 {meal.drinks}</div>}</div>
-                                    <div className="flex gap-2">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
+                                    <div className="flex gap-2 flex-wrap">{meal.ingredients.map((i, idx) => <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">{i.name} {i.qty && `(${i.qty})`}</span>)}</div>
                                   </div>
                                 )}
                                 {mealActivities.map(act => (
@@ -1100,51 +1098,85 @@ proposedPlaces.map(p => {
                 </div>
               </div>
 
+              {/* LISTE DE COURSES AVEC CATÉGORIES */}
               <div className="w-full lg:w-96">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sticky top-6">
                   <div className="flex justify-between mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-indigo-600"/> Courses</h3><span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded">{Object.keys(checkedItems).filter(k => checkedItems[k]).length}/{shoppingList.length}</span></div>
+                  
                   <form onSubmit={handleAddExtraItem} className="flex gap-2 mb-4">
-                    <input type="text" value={newExtraItem} onChange={e => setNewExtraItem(e.target.value)} placeholder="Article libre (Bières)" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
+                    <input type="text" list="ingredients-list" value={newExtraItem} onChange={e => setNewExtraItem(e.target.value)} placeholder="Article libre (Bières)" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
                     <input type="text" value={newExtraQty} onChange={e => setNewExtraQty(e.target.value)} placeholder="Qté" className="w-16 border rounded-xl px-2 py-2 text-sm" />
                     <button type="submit" className="bg-indigo-600 text-white p-2 rounded-xl"><Plus size={18}/></button>
                   </form>
-                  <div className="space-y-2 max-h-[70vh] overflow-y-auto">
-                    {shoppingList.map((item, idx) => (
-                      <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer border group ${checkedItems[item.id] ? 'bg-gray-50 opacity-50' : 'hover:border-indigo-100'}`}>
-                        <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
-                        <div className="flex-1">
-                          <div className="flex justify-between"><span className={`text-sm font-semibold ${checkedItems[item.id] ? 'line-through' : ''}`}>{item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}</span> {item.isExtra && <button onClick={(e) => handleDeleteExtraItem(item.dbId, e)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}</div>
-                          <div className="flex flex-wrap gap-1 mt-1">{item.tags.map((t:any, i:number) => <span key={i} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${t.color}`}>{t.text}</span>)}</div>
+                  
+                  <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 pb-10">
+                    {SHOPPING_CATEGORIES.map(category => {
+                      const itemsInCategory = shoppingList.filter(item => item.category === category);
+                      if (itemsInCategory.length === 0) return null;
+                      return (
+                        <div key={category} className="mb-2">
+                          <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-1 mb-2 text-sm">{category}</h4>
+                          <div className="space-y-1.5">
+                            {itemsInCategory.map((item, idx) => (
+                              <div key={idx} onClick={() => toggleCheck(item.id)} className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border group transition-all ${checkedItems[item.id] ? 'bg-gray-50 opacity-50 border-transparent' : 'bg-white hover:border-indigo-100 border-gray-100 shadow-sm'}`}>
+                                <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border ${checkedItems[item.id] ? 'bg-green-500 border-green-500 text-white' : ''}`}>{checkedItems[item.id] && <Check size={14} />}</div>
+                                <div className="flex-1">
+                                  <div className="flex justify-between"><span className={`text-sm font-semibold ${checkedItems[item.id] ? 'line-through' : ''}`}>{item.name} {item.displayQty && <span className="text-xs font-normal text-gray-500">({item.displayQty})</span>}</span> {item.isExtra && <button onClick={(e) => handleDeleteExtraItem(item.dbId, e)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}</div>
+                                  <div className="flex flex-wrap gap-1 mt-1">{item.tags.map((t:any, i:number) => <span key={i} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${t.color}`}>{t.text}</span>)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
 
+              {/* FORMULAIRE D'AJOUT DE REPAS AVEC GESTION DU BOUTON ENTRÉE */}
               {showMealForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                   <div className="bg-white w-full max-w-md rounded-2xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
-                    <div className="p-5 border-b flex justify-between"><h3 className="font-bold text-lg">{editingMealId ? 'Modifier le repas' : 'Nouveau repas'}</h3><button onClick={resetMealForm}><X size={18}/></button></div>
-                    <div className="p-5 overflow-y-auto space-y-4">
-                      <div className="font-bold text-indigo-700 bg-indigo-50 p-2 rounded">{mealDay} • {mealType}</div>
-                      <input type="text" value={mealName} onChange={e => setMealName(e.target.value)} placeholder="Plat principal *" className="w-full px-3 py-2 border rounded-xl" autoFocus />
-                      <div className="grid grid-cols-2 gap-3"><input type="text" value={mealStarter} onChange={e => setMealStarter(e.target.value)} placeholder="Entrée" className="border rounded-xl px-3 py-2" /><input type="text" value={mealDessert} onChange={e => setMealDessert(e.target.value)} placeholder="Dessert" className="border rounded-xl px-3 py-2" /></div>
-                      <input type="text" value={mealDrinks} onChange={e => setMealDrinks(e.target.value)} placeholder="Boissons" className="w-full border rounded-xl px-3 py-2" />
-                      <input type="url" value={mealRecipeLink} onChange={e => setMealRecipeLink(e.target.value)} placeholder="Lien Recette (Web)" className="w-full border rounded-xl px-3 py-2 text-indigo-600" />
-                      <div>
-                        <label className="text-xs font-bold text-gray-500 block mb-1">Ingrédients</label>
-                        {mealIngredients.map((ing, idx) => (
-                          <div key={idx} className="flex gap-2 mb-2">
-                            <input type="text" value={ing.name} onChange={e => { const i = [...mealIngredients]; i[idx].name = e.target.value; setMealIngredients(i); }} placeholder="Ingrédient" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
-                            <input type="text" value={ing.qty} onChange={e => { const i = [...mealIngredients]; i[idx].qty = e.target.value; setMealIngredients(i); }} placeholder="Qté" className="w-16 border rounded-xl px-2 py-2 text-sm" />
-                            <button onClick={() => setMealIngredients(mealIngredients.filter((_, i) => i !== idx))} className="text-red-400 p-2"><Trash2 size={16}/></button>
-                          </div>
-                        ))}
-                        <button onClick={() => setMealIngredients([...mealIngredients, {name:'', qty:''}])} className="text-indigo-600 text-xs font-bold flex items-center gap-1"><Plus size={12}/> Ajouter un ingrédient</button>
+                    <div className="p-5 border-b flex justify-between"><h3 className="font-bold text-lg">{editingMealId ? 'Modifier le repas' : 'Nouveau repas'}</h3><button type="button" onClick={resetMealForm}><X size={18}/></button></div>
+                    
+                    <form onSubmit={handleSaveMeal} className="flex-1 overflow-y-auto flex flex-col">
+                      <div className="p-5 space-y-4">
+                        <div className="font-bold text-indigo-700 bg-indigo-50 p-2 rounded">{mealDay} • {mealType}</div>
+                        <input type="text" value={mealName} onChange={e => setMealName(e.target.value)} placeholder="Plat principal *" className="w-full px-3 py-2 border rounded-xl" autoFocus />
+                        <div className="grid grid-cols-2 gap-3"><input type="text" value={mealStarter} onChange={e => setMealStarter(e.target.value)} placeholder="Entrée" className="border rounded-xl px-3 py-2" /><input type="text" value={mealDessert} onChange={e => setMealDessert(e.target.value)} placeholder="Dessert" className="border rounded-xl px-3 py-2" /></div>
+                        <input type="text" value={mealDrinks} onChange={e => setMealDrinks(e.target.value)} placeholder="Boissons" className="w-full border rounded-xl px-3 py-2" />
+                        <input type="url" value={mealRecipeLink} onChange={e => setMealRecipeLink(e.target.value)} placeholder="Lien Recette (Web)" className="w-full border rounded-xl px-3 py-2 text-indigo-600" />
+                        
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 block mb-1">Ingrédients</label>
+                          {mealIngredients.map((ing, idx) => (
+                            <div key={idx} className="flex gap-2 mb-2">
+                              <input 
+                                type="text" 
+                                list="ingredients-list"
+                                value={ing.name} 
+                                onChange={e => { const i = [...mealIngredients]; i[idx].name = e.target.value; setMealIngredients(i); }} 
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setMealIngredients([...mealIngredients, {name:'', qty:''}]); } }}
+                                placeholder="Ingrédient" 
+                                className="flex-1 border rounded-xl px-3 py-2 text-sm" 
+                              />
+                              <input 
+                                type="text" 
+                                value={ing.qty} 
+                                onChange={e => { const i = [...mealIngredients]; i[idx].qty = e.target.value; setMealIngredients(i); }} 
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setMealIngredients([...mealIngredients, {name:'', qty:''}]); } }}
+                                placeholder="Qté" 
+                                className="w-16 border rounded-xl px-2 py-2 text-sm" 
+                              />
+                              <button type="button" onClick={() => setMealIngredients(mealIngredients.filter((_, i) => i !== idx))} className="text-red-400 p-2"><Trash2 size={16}/></button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setMealIngredients([...mealIngredients, {name:'', qty:''}])} className="text-indigo-600 text-xs font-bold flex items-center gap-1"><Plus size={12}/> Ajouter un ingrédient</button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-5 border-t"><button onClick={handleSaveMeal} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider</button></div>
+                      <div className="p-5 border-t"><button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold">Valider le repas entier</button></div>
+                    </form>
                   </div>
                 </div>
               )}
@@ -1231,7 +1263,7 @@ proposedPlaces.map(p => {
             </div>
           )}
           
-          {/* GALERIE AVEC NOUVELLE GRILLE UNIQUE */}
+          {/* GALERIE */}
           {activeTab === 'gallery' && (
             <div className="max-w-6xl mx-auto space-y-6 relative">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -1252,7 +1284,6 @@ proposedPlaces.map(p => {
                   {displayedMedia.map((media, idx) => (
                     <div key={media.id} className="relative aspect-square group rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
                       
-                      {/* Badge informatif (visible uniquement en tri 'moment') */}
                       {gallerySortMode === 'moment' && (media.day || media.time_slot) && (
                         <div className="absolute top-2 left-2 z-10 bg-black/50 text-white text-[10px] px-2 py-1 rounded-md pointer-events-none backdrop-blur-sm">
                           {media.day?.replace(' (Arrivée)','').replace(' (Départ)','')} {media.time_slot ? `- ${media.time_slot}` : ''}
@@ -1283,7 +1314,7 @@ proposedPlaces.map(p => {
             </div>
           )}
           
-          {/* === MODALE D'ENVOI MULTIPLE AVEC SÉLECTION === */}
+          {/* MODALES DE MEDIA */}
           {showMediaUploadModal && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
               <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-5 max-h-[90vh] flex flex-col">
@@ -1316,7 +1347,6 @@ proposedPlaces.map(p => {
             </div>
           )}
 
-          {/* === MODALE DE MODIFICATION D'UNE PHOTO EXISTANTE === */}
           {editingMedia && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
               <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
@@ -1336,7 +1366,6 @@ proposedPlaces.map(p => {
             </div>
           )}
 
-          {/* VISIONNEUSE DE MEDIAS EN PLEIN ECRAN */}
           {viewerCurrentIndex !== null && viewerItems.length > 0 && (
             <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center backdrop-blur-md">
               <button onClick={closeViewer} className="absolute top-4 right-4 p-3 bg-white/10 rounded-full text-white z-[210]"><X size={24} /></button>
@@ -1348,43 +1377,41 @@ proposedPlaces.map(p => {
           )}
         </div>
       </main>
-  {/* === MODALE DE GESTION DES MEMBRES === */}
-{showMembersModal && (
-  <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-    <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="font-bold text-lg text-gray-800">Équipe ({members.length})</h3>
-        <button onClick={() => setShowMembersModal(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
-      </div>
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-        {members.map(m => (
-          <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-indigo-200">
-                {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
-              </div>
-              <div>
-                <div className="text-sm font-bold text-gray-800">{m.name} {m.id === currentUser?.id && <span className="text-indigo-500">(Moi)</span>}</div>
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{m.role}</div>
-              </div>
-            </div>
-            {isAdmin && m.id !== currentUser?.id && (
-              <button 
-                onClick={() => handleRemoveMember(m.id)} 
-                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white border border-red-100" 
-                title="Exclure du voyage"
-              >
-                <Trash2 size={16}/>
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
 
-<nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      {/* MODALE MEMBRES */}
+      {showMembersModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800">Équipe ({members.length})</h3>
+              <button onClick={() => setShowMembersModal(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"><X size={18}/></button>
+            </div>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {members.map(m => (
+                <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-indigo-200">
+                      {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{m.name} {m.id === currentUser?.id && <span className="text-indigo-500">(Moi)</span>}</div>
+                      <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{m.role}</div>
+                    </div>
+                  </div>
+                  {isAdmin && m.id !== currentUser?.id && (
+                    <button onClick={() => handleRemoveMember(m.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white border border-red-100" title="Exclure">
+                      <Trash2 size={16}/>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NAV MOBILE */}
+      <nav className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button onClick={() => setActiveTab('destination')} className={`flex flex-col items-center p-1.5 rounded-xl ${activeTab === 'destination' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
           <div className="relative"><Target size={20} />{!isLocked && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</div>
           <span className="text-[10px] mt-1">Lieu</span>
@@ -1405,8 +1432,6 @@ proposedPlaces.map(p => {
           <Camera size={20} /><span className="text-[10px] mt-1">Galerie</span>
         </button>
       </nav>
-          </div>
-    
+    </div>
   )
-
 }
