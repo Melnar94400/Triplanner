@@ -84,6 +84,13 @@ body {
   .border-gray-100, .border-gray-200 { border-color: var(--border-color) !important; }
   .text-gray-800, .text-gray-900, .text-gray-700 { color: var(--text-main) !important; }
   .text-gray-500, .text-gray-600, .text-gray-400 { color: var(--text-muted) !important; }
+  .text-gray-300 {
+    color: var(--text-muted) !important;
+    opacity: 0.8;
+  }
+  .text-gray-400 {
+    color: var(--text-muted) !important;
+  }
 
   input, select, textarea {
     background-color: var(--input-bg) !important;
