@@ -750,17 +750,6 @@ export default function TripPage() {
             </button>
           </div>
           
-          {/* Barre des thèmes défilable sur mobile */}
-          <div className="px-4 pb-3 flex items-center gap-3 overflow-x-auto hide-scrollbar">
-            <button onClick={() => changeTheme('sauge-terracotta')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('lavande-moutarde')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('sable-azur')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('rose-sapin')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('cafe-menthe')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#d6d3d1] to-[#0d9488] transition-transform ${appTheme === 'cafe-menthe' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('ocean-corail')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#cbd5e1] to-[#e11d48] transition-transform ${appTheme === 'ocean-corail' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('amethyste-or')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#e9d5ff] to-[#d97706] transition-transform ${appTheme === 'amethyste-or' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-            <button onClick={() => changeTheme('ciel-cerise')} className={`shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#bae6fd] to-[#db2777] transition-transform ${appTheme === 'ciel-cerise' ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' : ''}`} />
-          </div>
         </div>
         
         {/* === INJECTION DE LA DATALIST GLOBALE === */}

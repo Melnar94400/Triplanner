@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Cropper from 'react-easy-crop'
-import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock, Trash2 } from 'lucide-react'
+import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock, Trash2, Palette } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Moon, Sun } from 'lucide-react'
 
@@ -49,7 +49,15 @@ export default function ProfilePage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
+  // État du thème coloré
+  const [appTheme, setAppTheme] = useState('sauge-terracotta')
+
   useEffect(() => {
+    // Restaure le thème de couleur au chargement
+    const savedColorTheme = localStorage.getItem('trip-theme') || 'sauge-terracotta'
+    setAppTheme(savedColorTheme)
+    document.documentElement.setAttribute('data-theme', savedColorTheme)
+
     async function fetchProfile() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return router.push('/login')
@@ -63,7 +71,14 @@ export default function ProfilePage() {
       setLoading(false)
     }
     fetchProfile()
-  }, [])
+  }, [router])
+
+  // Changement de la couleur globale
+  const changeThemeColor = (t: string) => {
+    setAppTheme(t)
+    localStorage.setItem('trip-theme', t)
+    document.documentElement.setAttribute('data-theme', t)
+  }
 
   // 1. L'utilisateur sélectionne un fichier
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,7 +190,7 @@ export default function ProfilePage() {
   if (loading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-gray-400" /></div>
 
   return (
-    <div className="min-h-screen bg-primary-50/40 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6 my-8">
         <div className="flex justify-between items-center mb-2">
           <button onClick={() => router.push('/')} className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-sm font-bold transition-colors">
@@ -185,7 +200,7 @@ export default function ProfilePage() {
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
             className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-sm font-bold transition-colors"
           >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} Thème
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} Mode
           </button>
           <button onClick={handleLogout} className="text-gray-400 hover:text-gray-800 text-sm font-bold flex items-center gap-1 transition-colors">
             <LogOut size={14} /> Déconnexion
@@ -213,11 +228,31 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Mon prénom / Pseudo</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer le profil
           </button>
+        </div>
+
+        <hr className="border-gray-100 my-4" />
+
+        {/* SECTION APPARENCE / THEMES */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <Palette size={16} className="text-primary-600" /> Apparence
+          </h3>
+          <p className="text-xs text-gray-500">Choisis la palette de couleurs de ton application.</p>
+          <div className="grid grid-cols-4 gap-3">
+            <button onClick={() => changeThemeColor('sauge-terracotta')} title="Sauge & Terracotta" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#97b5a5] to-[#c2410c] transition-transform shadow-sm ${appTheme === 'sauge-terracotta' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('lavande-moutarde')} title="Lavande & Moutarde" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#dbeafe] to-[#ca8a04] transition-transform shadow-sm ${appTheme === 'lavande-moutarde' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('sable-azur')} title="Sable & Azur" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#e8dfc8] to-[#0284c7] transition-transform shadow-sm ${appTheme === 'sable-azur' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('rose-sapin')} title="Rose Pastel & Sapin" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#fbcfe8] to-[#059669] transition-transform shadow-sm ${appTheme === 'rose-sapin' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('cafe-menthe')} title="Café & Menthe" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#d6d3d1] to-[#0d9488] transition-transform shadow-sm ${appTheme === 'cafe-menthe' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('ocean-corail')} title="Océan & Corail" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#cbd5e1] to-[#e11d48] transition-transform shadow-sm ${appTheme === 'ocean-corail' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('amethyste-or')} title="Améthyste & Or" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#e9d5ff] to-[#d97706] transition-transform shadow-sm ${appTheme === 'amethyste-or' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+            <button onClick={() => changeThemeColor('ciel-cerise')} title="Ciel & Cerise" className={`w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#bae6fd] to-[#db2777] transition-transform shadow-sm ${appTheme === 'ciel-cerise' ? 'ring-2 ring-offset-2 ring-primary-600 scale-110' : ''}`} />
+          </div>
         </div>
 
         <hr className="border-gray-100 my-4" />
@@ -242,7 +277,7 @@ export default function ProfilePage() {
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
@@ -254,7 +289,7 @@ export default function ProfilePage() {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
