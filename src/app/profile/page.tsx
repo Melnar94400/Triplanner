@@ -213,7 +213,7 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Mon prénom / Pseudo</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-primary-50/40 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-primary-50/40 border border-primary-200/70 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer le profil
@@ -242,7 +242,7 @@ export default function ProfilePage() {
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-primary-50/40 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="••••••••" 
-                className="w-full px-4 py-2.5 bg-primary-50/40 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                className="w-full px-4 py-2.5 bg-primary-50/40 border border-primary-200/70 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 required
                 minLength={6}
               />
