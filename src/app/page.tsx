@@ -183,7 +183,7 @@ export default function Dashboard() {
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-indigo-600 mb-1">
+            <div className="flex items-center gap-2 text-primary-600 mb-1">
               <Compass size={24} />
               <span className="font-black text-xl tracking-tight">TripPlanner</span>
             </div>
@@ -199,19 +199,19 @@ export default function Dashboard() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-          <button onClick={() => { setShowCreateModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-indigo-600 text-white p-8 rounded-3xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 group">
+          <button onClick={() => { setShowCreateModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-primary-600 text-white p-8 rounded-3xl hover:bg-primary-700 transition-all shadow-lg shadow-primary-200 group">
             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Plus size={24} /></div>
             <span className="font-black text-lg">Créer un nouveau voyage</span>
           </button>
           
-          <button onClick={() => { setShowJoinModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-white border border-gray-200 text-gray-800 p-8 rounded-3xl hover:border-indigo-300 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 bg-gray-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Key size={24} /></div>
+          <button onClick={() => { setShowJoinModal(true); setError(null); }} className="flex flex-col items-center justify-center gap-3 bg-white border border-gray-200 text-gray-800 p-8 rounded-3xl hover:border-primary-300 hover:shadow-md transition-all group">
+            <div className="w-12 h-12 bg-gray-50 text-primary-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><Key size={24} /></div>
             <span className="font-black text-lg">Rejoindre avec un code</span>
           </button>
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><MapPin size={20} className="text-indigo-600" /> Mes voyages en cours</h2>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><MapPin size={20} className="text-primary-600" /> Mes voyages en cours</h2>
           
           {activeTrips.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm">
@@ -223,11 +223,11 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {activeTrips.map(trip => (
                 <Link key={trip.id} href={`/trip/${trip.id}`} className="block group">
-                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all h-full flex flex-col relative">
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-100 transition-all h-full flex flex-col relative">
                     
                     <button 
                       onClick={(e) => toggleArchive(trip.id, trip.is_archived, e)}
-                      className="absolute top-4 right-4 p-2 bg-gray-50 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                      className="absolute top-4 right-4 p-2 bg-gray-50 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                       title="Archiver ce voyage"
                     >
                       <Archive size={16} />
@@ -235,14 +235,14 @@ export default function Dashboard() {
 
                     <div className="flex-1 pr-8">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-black text-xl text-gray-800 group-hover:text-indigo-600 transition-colors line-clamp-1">{trip.name}</h3>
+                        <h3 className="font-black text-xl text-gray-800 group-hover:text-primary-600 transition-colors line-clamp-1">{trip.name}</h3>
                         {trip.role === 'admin' && <span className="bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider">Admin</span>}
                       </div>
                       <p className="text-sm text-gray-500 line-clamp-2 mb-4">{trip.description || "Aucune description"}</p>
                     </div>
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between mt-auto">
                       <div className="text-xs font-semibold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">Code: {trip.invite_code}</div>
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><ChevronRight size={16} /></div>
+                      <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors"><ChevronRight size={16} /></div>
                     </div>
                   </div>
                 </Link>
@@ -268,7 +268,7 @@ export default function Dashboard() {
                     </button>
 
                     <div className="flex-1 pr-8">
-                      <h3 className="font-bold text-gray-600 group-hover:text-indigo-600 transition-colors line-clamp-1 mb-1">{trip.name}</h3>
+                      <h3 className="font-bold text-gray-600 group-hover:text-primary-600 transition-colors line-clamp-1 mb-1">{trip.name}</h3>
                       <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                         Code: {trip.invite_code}
                       </p>
@@ -293,13 +293,13 @@ export default function Dashboard() {
               {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium border border-red-100">{error}</div>}
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Où allez-vous ?</label>
-                <input type="text" value={newTripName} onChange={e => setNewTripName(e.target.value)} placeholder="Ex: Week-end Ardèche 🏕️" required autoFocus className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-gray-800" />
+                <input type="text" value={newTripName} onChange={e => setNewTripName(e.target.value)} placeholder="Ex: Week-end Ardèche 🏕️" required autoFocus className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none font-semibold text-gray-800" />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Description (Optionnel)</label>
-                <textarea value={newTripDesc} onChange={e => setNewTripDesc(e.target.value)} placeholder="Ex: Du 12 au 15 Août." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24" />
+                <textarea value={newTripDesc} onChange={e => setNewTripDesc(e.target.value)} placeholder="Ex: Du 12 au 15 Août." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none h-24" />
               </div>
-              <button type="submit" disabled={actionLoading || !newTripName.trim()} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2">
+              <button type="submit" disabled={actionLoading || !newTripName.trim()} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-primary-700 shadow-md shadow-primary-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2">
                 {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />} Créer le voyage
               </button>
             </form>
@@ -321,10 +321,10 @@ export default function Dashboard() {
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Code d'invitation</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400"><Key size={18} /></div>
-                  <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Ex: a1b2c3d4" required autoFocus maxLength={8} className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-lg tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none font-black text-gray-800" />
+                  <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Ex: a1b2c3d4" required autoFocus maxLength={8} className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-lg tracking-widest focus:ring-2 focus:ring-primary-500 outline-none font-black text-gray-800" />
                 </div>
               </div>
-              <button type="submit" disabled={actionLoading || joinCode.length < 4} className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2 mt-4">
+              <button type="submit" disabled={actionLoading || joinCode.length < 4} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-primary-700 shadow-md shadow-primary-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2 mt-4">
                 {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <ChevronRight size={18} />} C'est parti !
               </button>
             </form>

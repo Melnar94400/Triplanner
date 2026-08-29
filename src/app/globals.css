@@ -1,83 +1,78 @@
 @import "tailwindcss";
 
-/* 1. ON DÉFINIT LE THÈME PAR DÉFAUT (VIOLET) */
 @theme {
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-200: #c7d2fe;
-  --color-primary-300: #a5b4fc;
-  --color-primary-400: #818cf8;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #4f46e5;
-  --color-primary-700: #4338ca;
-  --color-primary-800: #3730a3;
-  --color-primary-900: #312e81;
+  --color-primary-50: var(--p-50);
+  --color-primary-100: var(--p-100);
+  --color-primary-200: var(--p-200);
+  --color-primary-300: var(--p-300);
+  --color-primary-400: var(--p-400);
+  --color-primary-500: var(--p-500);
+  --color-primary-600: var(--p-600);
+  --color-primary-700: var(--p-700);
+  --color-primary-800: var(--p-800);
+  --color-primary-900: var(--p-900);
 }
 
-/* 2. ON SURCHARGE LES COULEURS SELON LE THEME CHOISI */
-@layer base {
-  html[data-theme='green'] {
-    --color-primary-50: #ecfdf5;
-    --color-primary-100: #d1fae5;
-    --color-primary-200: #a7f3d0;
-    --color-primary-300: #6ee7b7;
-    --color-primary-400: #34d399;
-    --color-primary-500: #10b981;
-    --color-primary-600: #059669;
-    --color-primary-700: #047857;
-    --color-primary-800: #065f46;
-    --color-primary-900: #064e3b;
-  }
-
-  html[data-theme='neutral'] {
-    --color-primary-50: #f8fafc;
-    --color-primary-100: #f1f5f9;
-    --color-primary-200: #e2e8f0;
-    --color-primary-300: #cbd5e1;
-    --color-primary-400: #94a3b8;
-    --color-primary-500: #64748b;
-    --color-primary-600: #475569;
-    --color-primary-700: #334155;
-    --color-primary-800: #1e293b;
-    --color-primary-900: #0f172a;
-  }
-
-  html[data-theme='rose'] {
-    --color-primary-50: #fff1f2;
-    --color-primary-100: #ffe4e6;
-    --color-primary-200: #fecdd3;
-    --color-primary-300: #fda4af;
-    --color-primary-400: #fb7185;
-    --color-primary-500: #f43f5e;
-    --color-primary-600: #e11d48;
-    --color-primary-700: #be123c;
-    --color-primary-800: #9f1239;
-    --color-primary-900: #881337;
-  }
+/* Thème Violet (défaut) */
+:root, html[data-theme='violet'] {
+  --p-50: #eef2ff;
+  --p-100: #e0e7ff;
+  --p-200: #c7d2fe;
+  --p-300: #a5b4fc;
+  --p-400: #818cf8;
+  --p-500: #6366f1;
+  --p-600: #4f46e5;
+  --p-700: #4338ca;
+  --p-800: #3730a3;
+  --p-900: #312e81;
 }
 
-/* Paramètres de base de ton projet Next.js */
+html[data-theme='green'] {
+  --p-50: #ecfdf5;
+  --p-100: #d1fae5;
+  --p-200: #a7f3d0;
+  --p-300: #6ee7b7;
+  --p-400: #34d399;
+  --p-500: #10b981;
+  --p-600: #059669;
+  --p-700: #047857;
+  --p-800: #065f46;
+  --p-900: #064e3b;
+}
+
+html[data-theme='neutral'] {
+  --p-50: #f8fafc;
+  --p-100: #f1f5f9;
+  --p-200: #e2e8f0;
+  --p-300: #cbd5e1;
+  --p-400: #94a3b8;
+  --p-500: #64748b;
+  --p-600: #475569;
+  --p-700: #334155;
+  --p-800: #1e293b;
+  --p-900: #0f172a;
+}
+
+html[data-theme='rose'] {
+  --p-50: #fff1f2;
+  --p-100: #ffe4e6;
+  --p-200: #fecdd3;
+  --p-300: #fda4af;
+  --p-400: #fb7185;
+  --p-500: #f43f5e;
+  --p-600: #e11d48;
+  --p-700: #be123c;
+  --p-800: #9f1239;
+  --p-900: #881337;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #141f19;
-    --foreground: #d4e2d8;
-  }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #f8fafc;
+  color: #1f2937;
   font-family: Arial, Helvetica, sans-serif;
-}
-
-::selection {
-  background-color: var(--color-primary-200);
-  color: var(--color-primary-900);
 }
