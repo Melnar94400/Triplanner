@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Cropper from 'react-easy-crop'
-import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock, Trash2, Palette } from 'lucide-react'
+import { ChevronLeft, Camera, Loader2, Save, LogOut, Lock, Trash2, Palette, X, Utensils } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Moon, Sun } from 'lucide-react'
 
@@ -37,6 +37,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Nouveaux états pour les préférences alimentaires
+  const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([])
+  const [newPref, setNewPref] = useState('')
+
   // États pour le recadrage
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
@@ -53,7 +57,6 @@ export default function ProfilePage() {
   const [appTheme, setAppTheme] = useState('sauge-terracotta')
 
   useEffect(() => {
-    // Restaure le thème de couleur au chargement
     const savedColorTheme = localStorage.getItem('trip-theme') || 'sauge-terracotta'
     setAppTheme(savedColorTheme)
     document.documentElement.setAttribute('data-theme', savedColorTheme)
@@ -67,20 +70,19 @@ export default function ProfilePage() {
       if (profile) {
         setName(profile.name || '')
         setAvatar(profile.avatar || '👤')
+        setDietaryPrefs(profile.dietary_prefs || [])
       }
       setLoading(false)
     }
     fetchProfile()
   }, [router])
 
-  // Changement de la couleur globale
   const changeThemeColor = (t: string) => {
     setAppTheme(t)
     localStorage.setItem('trip-theme', t)
     document.documentElement.setAttribute('data-theme', t)
   }
 
-  // 1. L'utilisateur sélectionne un fichier
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
@@ -90,18 +92,15 @@ export default function ProfilePage() {
     }
   }
 
-  // 2. Le module met à jour les coordonnées du crop
   const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels)
   }, [])
 
-  // 3. Validation du crop et Upload
   const handleCropSave = async () => {
     if (!imageSrc || !croppedAreaPixels || !user) return
     setSaving(true)
     try {
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels)
-      
       const filePath = `${user.id}/avatar.jpg`
       const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, croppedBlob, { upsert: true })
       if (uploadError) throw uploadError
@@ -121,7 +120,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Gestion du changement de mot de passe sécurisé
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newPassword || newPassword.length < 6) {
@@ -149,12 +147,29 @@ export default function ProfilePage() {
     }
   }
 
-  // Sauvegarde globale du profil
+  // --- GESTION DES PREFERENCES ALIMENTAIRES ---
+  const handleAddPref = () => {
+    const val = newPref.trim()
+    if (val && !dietaryPrefs.includes(val)) {
+      setDietaryPrefs([...dietaryPrefs, val])
+    }
+    setNewPref('')
+  }
+
+  const handleRemovePref = (prefToRemove: string) => {
+    setDietaryPrefs(dietaryPrefs.filter(p => p !== prefToRemove))
+  }
+
   const handleSaveProfile = async () => {
     if (!name.trim()) return alert("Le nom est obligatoire")
     setSaving(true)
     try {
-      await supabase.from('profiles').upsert({ id: user.id, name: name.trim(), avatar: avatar })
+      await supabase.from('profiles').upsert({ 
+        id: user.id, 
+        name: name.trim(), 
+        avatar: avatar,
+        dietary_prefs: dietaryPrefs // Sauvegarde des tags
+      })
       alert("Profil mis à jour !")
       router.push('/')
     } catch (err: any) {
@@ -169,7 +184,6 @@ export default function ProfilePage() {
     router.push('/login')
   }
 
-  // Suppression du compte
   const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm("🚨 Attention ! Es-tu sûr de vouloir supprimer définitivement ton compte ? Cette action est irréversible.")
     if (!confirmDelete) return
@@ -230,7 +244,45 @@ export default function ProfilePage() {
             <label className="block text-xs font-bold uppercase text-gray-500 mb-2">Mon prénom / Pseudo</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2">
+
+          {/* NOUVELLE SECTION : PRÉFÉRENCES ALIMENTAIRES */}
+          <div className="pt-2">
+            <label className="flex items-center gap-2 text-xs font-bold uppercase text-gray-500 mb-3">
+              <Utensils size={14} /> Préférences & Allergies
+            </label>
+            
+            <div className="flex flex-wrap gap-2 mb-3">
+              {dietaryPrefs.map(pref => (
+                <span key={pref} className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 border border-orange-100 shadow-sm">
+                  {pref}
+                  <button onClick={() => handleRemovePref(pref)} className="text-orange-400 hover:text-orange-600 bg-white rounded-full p-0.5">
+                    <X size={12}/>
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={newPref} 
+                onChange={e => setNewPref(e.target.value)} 
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPref(); } }}
+                placeholder="Ex: Végétarien, Sans gluten, Arachides..." 
+                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-500" 
+              />
+              <button 
+                onClick={handleAddPref} 
+                type="button" 
+                className="bg-gray-100 text-gray-600 px-4 rounded-xl font-bold hover:bg-gray-200 transition-colors text-sm border border-gray-200"
+              >
+                Ajouter
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2 italic">Ces informations seront visibles par les cuisiniers lors de la planification des repas.</p>
+          </div>
+
+          <button onClick={handleSaveProfile} disabled={saving} className="w-full bg-primary-600 text-white py-3.5 rounded-xl font-bold hover:bg-primary-700 shadow-md shadow-primary-200 transition-all flex items-center justify-center gap-2 mt-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer le profil
           </button>
         </div>

@@ -17,7 +17,7 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false })
 
 // --- TYPES ---
 type Meal = { id: string | number; day: string; type: string; name: string; starter?: string; dessert?: string; drinks?: string; recipeLink?: string; cooks: string[]; ingredients: { name: string; qty: string }[]; };
-type Member = { id: string; name: string; avatar: string; role: string; };
+type Member = { id: string; name: string; avatar: string; role: string; dietary_prefs?: string[]; };
 type ActivityVote = 'yes' | 'maybe' | 'no';
 type Activity = { id: string | number; title: string; description: string; price: number | string; link: string; address?: string; durationFromAcc?: string; proposedBy: string; day?: string; timeSlot?: string; lat?: number; lng?: number; votes: Record<string, ActivityVote>; }
 type MediaItem = { id: string; file_path: string; media_type: string; uploader_id: string; day?: string; time_slot?: string; };
@@ -247,20 +247,32 @@ const openViewer = (items: MediaItem[], idx: number) => {
       setTrip(tripData)
 
       // Chargement Membres
-      const { data: membersData } = await supabase.from('trip_members').select('user_id, role, profiles(id, name, avatar)').eq('trip_id', tripId)
+// Chargement Membres
+      const { data: membersData } = await supabase.from('trip_members').select('user_id, role, profiles(id, name, avatar, dietary_prefs)').eq('trip_id', tripId)
       let loadedMembers: Member[] = []; 
       let isUserInTrip = false;
       if (membersData) {
-        loadedMembers = membersData.map((m: any) => ({ id: m.profiles.id, name: m.profiles.name, avatar: m.profiles.avatar || '👤', role: m.role }));
+        loadedMembers = membersData.map((m: any) => ({ 
+          id: m.profiles.id, 
+          name: m.profiles.name, 
+          avatar: m.profiles.avatar || '👤', 
+          role: m.role,
+          dietary_prefs: m.profiles.dietary_prefs || []
+        }));
         isUserInTrip = loadedMembers.some(m => m.id === session.user.id);
       }
       if (!isUserInTrip) {
         await supabase.from('trip_members').insert({ trip_id: tripId, user_id: session.user.id, role: 'admin' });
         const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        if (myProfile) loadedMembers.push({ id: myProfile.id, name: myProfile.name, avatar: myProfile.avatar || '👤', role: 'admin' });
+        if (myProfile) loadedMembers.push({ 
+          id: myProfile.id, 
+          name: myProfile.name, 
+          avatar: myProfile.avatar || '👤', 
+          role: 'admin',
+          dietary_prefs: myProfile.dietary_prefs || []
+        });
       }
       setMembers(loadedMembers)
-
       // Chargement Étape 1
       const { data: wData } = await supabase.from('proposed_weeks').select('*').eq('trip_id', tripId).order('created_at', { ascending: true })
       if (wData) setProposedWeeks(wData.map((w:any) => ({id: w.id, text: w.week_text, votes: w.votes || [], by: w.proposed_by})))
@@ -1314,8 +1326,43 @@ const openViewer = (items: MediaItem[], idx: number) => {
             <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto relative">
               <div className="flex-1 space-y-6">
                 <h2 className="text-2xl font-bold text-gray-800">Planning des repas</h2>
-                <div className="space-y-4">
-                  {WEEK_DAYS.map(day => (
+<h2 className="text-2xl font-bold text-gray-800">Planning des repas</h2>
+              
+              {/* --- PENSE-BÊTE ALIMENTAIRE --- */}
+              {(() => {
+                const membersWithPrefs = members.filter(m => m.dietary_prefs && m.dietary_prefs.length > 0);
+                if (membersWithPrefs.length === 0) return null;
+                return (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-400"></div>
+                    <h3 className="font-black text-orange-800 flex items-center gap-2 mb-3">
+                      <Utensils size={18} /> Pense-bête du Chef
+                    </h3>
+                    <div className="flex flex-col gap-3">
+                      {membersWithPrefs.map(m => (
+                        <div key={m.id} className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
+                          <span className="font-bold text-orange-900 w-24 shrink-0 flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full overflow-hidden bg-orange-200 border border-orange-300 flex items-center justify-center text-[8px]">
+                              {m.avatar?.startsWith('http') ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : m.avatar}
+                            </div>
+                            {m.name}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.dietary_prefs?.map(pref => (
+                              <span key={pref} className="bg-white text-orange-700 px-2.5 py-1 rounded-lg border border-orange-100 text-xs font-bold shadow-sm">
+                                {pref}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+              {/* ------------------------------- */}
+
+              <div className="space-y-4">                  {WEEK_DAYS.map(day => (
                     <div key={day} className="bg-white rounded-2xl border shadow-sm">
                       <div className="bg-gray-50 px-4 py-2 border-b font-bold text-gray-700">{day}</div>
                       <div className="divide-y">
