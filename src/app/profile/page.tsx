@@ -160,25 +160,28 @@ export default function ProfilePage() {
     setDietaryPrefs(dietaryPrefs.filter(p => p !== prefToRemove))
   }
 
-  const handleSaveProfile = async () => {
+const handleSaveProfile = async () => {
     if (!name.trim()) return alert("Le nom est obligatoire")
     setSaving(true)
     try {
-      await supabase.from('profiles').upsert({ 
+      const { error } = await supabase.from('profiles').upsert({ 
         id: user.id, 
         name: name.trim(), 
         avatar: avatar,
         dietary_prefs: dietaryPrefs // Sauvegarde des tags
       })
+      
+      if (error) throw error // C'EST CETTE LIGNE QUI MANQUAIT !
+
       alert("Profil mis à jour !")
       router.push('/')
     } catch (err: any) {
-      alert("Erreur : " + err.message)
+      alert("Erreur lors de la sauvegarde : " + err.message)
     } finally {
       setSaving(false)
     }
   }
-
+  
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
