@@ -165,13 +165,14 @@ const handleSaveProfile = async () => {
     setSaving(true)
     try {
       const { error } = await supabase.from('profiles').upsert({ 
-        id: user.id, 
+        id: user.id,
+        email: user.email, // <-- AJOUT DE L'EMAIL ICI
         name: name.trim(), 
         avatar: avatar,
-        dietary_prefs: dietaryPrefs // Sauvegarde des tags
+        dietary_prefs: dietaryPrefs 
       })
       
-      if (error) throw error // C'EST CETTE LIGNE QUI MANQUAIT !
+      if (error) throw error 
 
       alert("Profil mis à jour !")
       router.push('/')
@@ -180,8 +181,7 @@ const handleSaveProfile = async () => {
     } finally {
       setSaving(false)
     }
-  }
-  
+  }  
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
