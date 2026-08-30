@@ -900,6 +900,42 @@ const openViewer = (items: MediaItem[], idx: number) => {
                       <p className="text-gray-500 text-sm font-semibold">{trip.trip_week}</p>
                     </div>
                     {isAdmin && <button onClick={handleUnlockPhase1} className="text-xs font-bold text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors">Modifier région</button>}
+                    {/* MODALE AJOUT/EDITION DE GÎTE */}
+                  {showPlaceForm && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                      <form onSubmit={handleSavePlace} className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-bold text-gray-800">{editingPlaceId ? "Modifier le gîte" : "Proposer un gîte"}</h3>
+                          <button 
+                            type="button" 
+                            onClick={() => { 
+                              setShowPlaceForm(false); 
+                              setEditingPlaceId(null); 
+                              setPlaceData({name: '', address: '', price: '', beds: '', amenities: '', link: '', lat: null, lng: null}); 
+                            }} 
+                            className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-lg"
+                          >
+                            <X size={18}/>
+                          </button>
+                        </div>
+                        
+                        <input type="text" value={placeData.name} onChange={e => setPlaceData({...placeData, name: e.target.value})} placeholder="Nom du logement *" className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm outline-none focus:border-primary-500" required />
+                        <input type="text" value={placeData.address} onChange={e => setPlaceData({...placeData, address: e.target.value})} placeholder="Adresse complète (pour la carte) *" className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm outline-none focus:border-primary-500" required />
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <input type="number" value={placeData.price} onChange={e => setPlaceData({...placeData, price: e.target.value})} placeholder="Prix total (€)" className="border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 text-sm outline-none focus:border-primary-500"/>
+                          <input type="number" value={placeData.beds} onChange={e => setPlaceData({...placeData, beds: e.target.value})} placeholder="Nb. couchages" className="border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 text-sm outline-none focus:border-primary-500"/>
+                        </div>
+                        
+                        <input type="text" value={placeData.amenities} onChange={e => setPlaceData({...placeData, amenities: e.target.value})} placeholder="Les + (Piscine, Billard, etc.)" className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm outline-none focus:border-primary-500" />
+                        <input type="url" value={placeData.link} onChange={e => setPlaceData({...placeData, link: e.target.value})} placeholder="Lien (Airbnb, Booking...)" className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm outline-none focus:border-primary-500" />
+                        
+                        <button type="submit" className="w-full bg-primary-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-primary-700 transition-colors">
+                          {editingPlaceId ? "Enregistrer les modifications" : "Proposer à l'équipe"}
+                        </button>
+                      </form>
+                    </div>
+                  )}
                   </div>
 
                   <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 mb-8">
