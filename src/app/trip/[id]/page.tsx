@@ -85,7 +85,32 @@ export default function TripPage() {
   // Journal de Bord & Commentaires
   const [events, setEvents] = useState<TripEvent[]>([])
   const [comments, setComments] = useState<Comment[]>([])
-  const [showEventsModal, setShowEventsModal] = useState(false)
+const [showEventsModal, setShowEventsModal] = useState(false)
+  const [lastSeenTime, setLastSeenTime] = useState<number>(Date.now())
+
+  // Au chargement, on récupère la date de dernière vue du journal
+  useEffect(() => {
+    const saved = localStorage.getItem(`trip_${tripId}_last_seen`);
+    if (saved) setLastSeenTime(Number(saved));
+    else setLastSeenTime(0); // 0 = Tout est nouveau la première fois
+  }, [tripId]);
+
+  // Calcul du nombre de notifications non lues
+  const unreadCount = useMemo(() => {
+    return events.filter(e => new Date(e.created_at).getTime() > lastSeenTime).length;
+  }, [events, lastSeenTime]);
+
+  const openEvents = () => setShowEventsModal(true);
+  
+  const closeEvents = () => {
+    setShowEventsModal(false);
+    if (events.length > 0) {
+      // On sauvegarde la date de l'événement le plus récent
+      const latest = new Date(events[0].created_at).getTime();
+      setLastSeenTime(latest);
+      localStorage.setItem(`trip_${tripId}_last_seen`, latest.toString());
+    }
+  };
   const [activeComments, setActiveComments] = useState<{ id: string, title: string, type: string } | null>(null)
   const [newComment, setNewComment] = useState('')
 
@@ -597,8 +622,8 @@ const openViewer = (items: MediaItem[], idx: number) => {
   };
   
   const handleDeleteExpense = async (id: string | number) => { await supabase.from('expenses').delete().eq('id', id); fetchTripData(); };
-  const handleSettleDebt = async (payerId: string, receiverId: string, amount: number) => { if (!confirm("Confirmer le remboursement ?")) return; await supabase.from('settlements').insert([{ trip_id: tripId, payer_id: payerId, receiver_id: receiverId, amount: amount }]); logEvent('a validé un remboursement', `${amount}€`); fetchTripData(); };
-  
+  const handleSettleDebt = async (payerId: string, receiverId: string, amount: number) => { if (!confirm("Confirmer le remboursement ?")) return; await supabase.from('settlements').insert([{ trip_id: tripId, payer_id: payerId, receiver_id: receiverId, amount: amount }]); logEvent('a validé un remboursement', `${amount.toFixed(2)}€`); fetchTripData(); };
+
   const { balances, reimbursements, allKnownMembers } = useMemo(() => { 
     const userBalances: Record<string, number> = {}; 
     const ghostMembers = [...members]; 
@@ -740,9 +765,9 @@ const openViewer = (items: MediaItem[], idx: number) => {
             <button onClick={() => { const inviteLink = `${window.location.origin}/join/${trip.invite_code}`; navigator.clipboard.writeText(inviteLink); alert("Lien copié !"); }} className="flex-1 flex justify-center items-center gap-2 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-2 rounded-xl hover:bg-primary-100 transition-colors shadow-sm group">
               <Copy size={14} className="group-hover:scale-110 transition-transform" /> Partager
             </button>
-            <button onClick={() => setShowEventsModal(true)} className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 p-2 rounded-xl transition-colors relative">
+<button onClick={openEvents} className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 p-2 rounded-xl transition-colors relative">
               <Bell size={16} />
-              {events.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
+              {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-100"></span>}
             </button>
           </div>
           <button onClick={() => setShowMembersModal(true)} className="mt-2 flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors shadow-sm w-full justify-center">
@@ -781,11 +806,10 @@ const openViewer = (items: MediaItem[], idx: number) => {
               <h1 className="font-black text-primary-600 text-lg truncate max-w-[200px]">{trip.name}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowEventsModal(true)} className="relative p-2 bg-gray-50 text-gray-500 rounded-xl hover:text-primary-600 transition-colors">
+<button onClick={openEvents} className="relative p-2 bg-gray-50 text-gray-500 rounded-xl hover:text-primary-600 transition-colors">
                 <Bell size={18} />
-                {events.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
-              </button>
-              <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors">
+                {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>}
+              </button>              <button onClick={() => setShowMembersModal(true)} className="text-xs font-bold bg-primary-50 text-primary-600 p-2 rounded-xl hover:bg-primary-100 transition-colors">
                 <Users size={18} />
               </button>
             </div>
@@ -1651,33 +1675,46 @@ const openViewer = (items: MediaItem[], idx: number) => {
             </div>
           )}
 
-          {/* 4. MODALE ÉVÉNEMENTS (Journal de bord) */}
+{/* 4. MODALE ÉVÉNEMENTS (Journal de bord) */}
           {showEventsModal && (
             <div className="fixed inset-0 z-[150] flex justify-end bg-black/20 backdrop-blur-sm">
               <div className="bg-white w-full max-w-sm h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                 <div className="p-5 border-b flex justify-between items-center bg-gray-50">
-                  <h3 className="font-black text-lg text-gray-800 flex items-center gap-2"><Bell size={20} className="text-primary-600"/> Journal de bord</h3>
-                  <button onClick={() => setShowEventsModal(false)} className="text-gray-400 hover:text-gray-600 p-1.5 bg-white rounded-lg border shadow-sm"><X size={18}/></button>
+                  <h3 className="font-black text-lg text-gray-800 flex items-center gap-2">
+                    <Bell size={20} className="text-primary-600"/> Journal de bord
+                  </h3>
+                  <button onClick={closeEvents} className="text-gray-400 hover:text-gray-600 p-1.5 bg-white rounded-lg border shadow-sm">
+                    <X size={18}/>
+                  </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                  {events.length === 0 ? <p className="text-sm text-gray-400 italic text-center mt-10">Aucune activité récente.</p> : events.map(ev => (
-                    <div key={ev.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-xs shrink-0 overflow-hidden border border-primary-200">
-                        {getMember(ev.user_id).avatar?.startsWith('http') ? <img src={getMember(ev.user_id).avatar} className="w-full h-full object-cover" /> : getMember(ev.user_id).avatar}
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-800 leading-tight">
-                          <span className="font-bold">{getMember(ev.user_id).name}</span> {ev.action} <span className="font-semibold text-primary-700">{ev.details}</span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {events.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic text-center mt-10">Aucune activité récente.</p>
+                  ) : (
+                    events.map(ev => {
+                      const isNew = new Date(ev.created_at).getTime() > lastSeenTime;
+                      return (
+                        <div key={ev.id} className={`flex gap-3 p-3 rounded-xl transition-colors ${isNew ? 'bg-primary-50 border border-primary-100 shadow-sm' : ''}`}>
+                          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-xs shrink-0 overflow-hidden border border-primary-200">
+                            {getMember(ev.user_id).avatar?.startsWith('http') ? <img src={getMember(ev.user_id).avatar} className="w-full h-full object-cover" /> : getMember(ev.user_id).avatar}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-800 leading-tight">
+                              <span className="font-bold">{getMember(ev.user_id).name}</span> {ev.action} <span className="font-semibold text-primary-700">{ev.details}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{timeAgo(ev.created_at)}</span>
+                              {isNew && <span className="text-[8px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Nouveau</span>}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wide">{timeAgo(ev.created_at)}</div>
-                      </div>
-                    </div>
-                  ))}
+                      )
+                    })
+                  )}
                 </div>
               </div>
             </div>
           )}
-
           {/* 5. MODALE COMMENTAIRES */}
           {activeComments && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
